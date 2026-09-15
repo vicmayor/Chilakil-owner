@@ -1,0 +1,291 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// SQLite for local/dev. To move to Postgres later:
+// 1. Change provider to "postgresql"
+// 2. Set DATABASE_URL to a Postgres connection string
+// 3. Run `npx prisma migrate dev`
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("owner")
+  createdAt    DateTime @default(now())
+}
+
+/// Independently tracked operation. Never share financial rows across locations.
+model Location {
+  id        String @id
+  name      String
+  shortName String
+  type      String // restaurant | trailer
+  timezone  String
+  address   String?
+  city      String?
+  phone     String?
+
+  orders             Order[]
+  dailySales         DailySales[]
+  deliverySummaries  DeliverySummary[]
+  dailyOps           DailyOps[]
+  expenses           Expense[]
+  ingredients        Ingredient[]
+  recipes            Recipe[]
+  menuItems          MenuItem[]
+  messages           CustomerMessage[]
+  reviews            Review[]
+  campaigns          MarketingCampaign[]
+  employees          Employee[]
+  shifts             Shift[]
+  integrations       IntegrationConfig[]
+  alerts             Alert[]
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  locationId  String
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  channel     String // in_store | doordash | ubereats | grubhub | other
+  orderedAt   DateTime
+  gross       Float
+  fees        Float
+  net         Float
+  guestName   String?
+  itemSummary String?
+
+  @@index([locationId, orderedAt])
+  @@index([locationId, channel])
+}
+
+model DailySales {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  date       String // YYYY-MM-DD in America/Phoenix
+  channel    String
+  gross      Float
+  fees       Float
+  net        Float
+  orderCount Int
+
+  @@unique([locationId, date, channel])
+  @@index([locationId, date])
+}
+
+model DeliverySummary {
+  id              String   @id @default(cuid())
+  locationId      String
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  platform        String // doordash | ubereats | grubhub
+  date            String
+  orderCount      Int
+  gross           Float
+  commission      Float
+  otherFees       Float
+  net             Float
+  avgPrepMinutes  Float?
+  cancelledOrders Int      @default(0)
+  refunds         Float    @default(0)
+
+  @@unique([locationId, platform, date])
+  @@index([locationId, date])
+}
+
+model DailyOps {
+  id                    String   @id @default(cuid())
+  locationId            String
+  location              Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  date                  String
+  laborHours            Float
+  laborCost             Float
+  theoreticalFoodCost   Float
+  actualFoodPurchases   Float
+  targetLaborPct        Float
+  targetFoodCostPct     Float
+
+  @@unique([locationId, date])
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  category   String
+  amount     Float
+  date       String
+  vendor     String
+  notes      String?
+  recurring  Boolean  @default(false)
+
+  @@index([locationId, date])
+}
+
+model Ingredient {
+  id           String              @id @default(cuid())
+  locationId   String
+  location     Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name         String
+  unit         String
+  costPerUnit  Float
+  onHand       Float
+  reorderPoint Float
+  vendor       String?
+  recipeLines  RecipeIngredient[]
+}
+
+model Recipe {
+  id          String             @id @default(cuid())
+  locationId  String
+  location    Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name        String
+  yieldQty    Float              @default(1)
+  yieldUnit   String             @default("serving")
+  notes       String?
+  ingredients RecipeIngredient[]
+  menuItems   MenuItem[]
+}
+
+model RecipeIngredient {
+  id           String     @id @default(cuid())
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  quantity     Float
+}
+
+model MenuItem {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name       String
+  category   String
+  price      Float
+  recipeId   String?
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  active     Boolean  @default(true)
+}
+
+model CustomerMessage {
+  id                     String   @id @default(cuid())
+  locationId             String
+  location               Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  platform               String
+  customerName           String
+  language               String // en | es
+  body                   String
+  receivedAt             DateTime
+  status                 String // new | pending_approval | approved | rejected | sent
+  category               String // general | complaint | refund | allergy | catering | other
+  sensitive              Boolean
+  requiresOwnerApproval  Boolean
+  sensitivityFlags       String // JSON string array
+  draftReply             String?
+  approvedReply          String?
+  ownerNote              String?
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  platform     String
+  rating       Int
+  author       String
+  text         String
+  reviewedAt   DateTime
+  responded    Boolean  @default(false)
+  responseText String?
+}
+
+model MarketingCampaign {
+  id         String    @id @default(cuid())
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  name       String
+  channel    String
+  status     String
+  startDate  String
+  endDate    String?
+  spend      Float
+  impressions Int?
+  clicks     Int?
+  notes      String?
+}
+
+model Employee {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name       String
+  role       String
+  hourlyRate Float
+  active     Boolean  @default(true)
+  phone      String?
+  shifts     Shift[]
+}
+
+model Shift {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  date       String
+  startTime  String
+  endTime    String
+  hours      Float
+  laborCost  Float
+  role       String
+}
+
+/// Stores secret *references* (env var names), never secret values.
+model IntegrationConfig {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  provider   String
+  status     String // placeholder | connected | disconnected
+  secretRef  String
+  storeRef   String?
+  notes      String?
+
+  @@unique([locationId, provider])
+}
+
+model Alert {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  type       String
+  severity   String // info | warning | critical
+  title      String
+  body       String
+  date       String
+  href       String?
+  read       Boolean  @default(false)
+}
+
+model AiThread {
+  id            String      @id @default(cuid())
+  title         String
+  locationScope String
+  createdAt     DateTime    @default(now())
+  messages      AiMessage[]
+}
+
+model AiMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  thread    AiThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role      String // user | assistant
+  content   String
+  createdAt DateTime @default(now())
+}
