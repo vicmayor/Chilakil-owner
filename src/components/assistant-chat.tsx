@@ -70,7 +70,7 @@ export function AssistantChat({
             key={`${turn.role}-${i}`}
             className={`whitespace-pre-wrap rounded-2xl px-4 py-3 text-[15px] leading-6 ${
               turn.role === "user"
-                ? "ml-8 bg-chile text-white"
+                ? "ml-8 bg-chile font-medium text-black"
                 : "mr-4 border border-line bg-card"
             }`}
           >
@@ -91,12 +91,12 @@ export function AssistantChat({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question"
-          className="min-h-12 flex-1 rounded-2xl border border-line bg-card px-4 text-base outline-none ring-chile/30 focus:ring-2"
+          className="min-h-12 flex-1 rounded-2xl border border-line bg-card px-4 text-base outline-none ring-chile/40 focus:ring-2"
         />
         <button
           type="submit"
           disabled={pending}
-          className="min-h-12 rounded-2xl bg-chile px-4 text-sm font-semibold text-white disabled:opacity-60"
+          className="min-h-12 rounded-2xl bg-chile px-4 text-sm font-extrabold text-black disabled:opacity-60"
         >
           Send
         </button>

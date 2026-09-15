@@ -1,18 +1,17 @@
 import { loginAction } from "@/app/actions/auth";
 import { LoginForm } from "@/components/login-form";
+import { BrandLogo } from "@/components/brand-logo";
 
 export const metadata = { title: "Sign in" };
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-dvh flex-col bg-paper px-5 pb-[env(safe-area-inset-bottom)] pt-[max(2.5rem,env(safe-area-inset-top))]">
+    <div className="flex min-h-dvh flex-col bg-black px-5 pb-[env(safe-area-inset-bottom)] pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-chile">
-          Chilakil To Go
-        </p>
-        <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight">
+        <BrandLogo />
+        <p className="mt-4 text-xs font-extrabold uppercase tracking-[0.28em] text-chile">
           Owner
-        </h1>
+        </p>
         <p className="mt-3 max-w-sm text-[15px] leading-6 text-muted">
           Glendale restaurant and Avondale trailer stay on separate books. Sign
           in to see today.

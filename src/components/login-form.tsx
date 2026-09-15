@@ -20,7 +20,7 @@ export function LoginForm({ action }: Props) {
           autoComplete="username"
           required
           defaultValue="owner@chilakil.com"
-          className="mt-1.5 w-full rounded-2xl border border-line bg-card px-4 text-base outline-none ring-chile/30 focus:ring-2"
+          className="mt-1.5 w-full rounded-2xl border border-line bg-card px-4 text-base text-ink outline-none ring-chile/40 focus:ring-2"
         />
       </label>
       <label className="block">
@@ -30,7 +30,7 @@ export function LoginForm({ action }: Props) {
           type="password"
           autoComplete="current-password"
           required
-          className="mt-1.5 w-full rounded-2xl border border-line bg-card px-4 text-base outline-none ring-chile/30 focus:ring-2"
+          className="mt-1.5 w-full rounded-2xl border border-line bg-card px-4 text-base text-ink outline-none ring-chile/40 focus:ring-2"
         />
       </label>
       {state?.error ? (
@@ -41,7 +41,7 @@ export function LoginForm({ action }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="flex w-full items-center justify-center rounded-2xl bg-chile px-4 text-base font-semibold text-white disabled:opacity-60"
+        className="flex w-full items-center justify-center rounded-2xl bg-chile px-4 text-base font-extrabold text-black disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>

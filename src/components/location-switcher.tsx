@@ -38,16 +38,14 @@ export function LocationSwitcher({ value }: { value: LocationScope }) {
             role="tab"
             aria-selected={active}
             onClick={() => select(opt.id)}
-            className={`flex min-h-11 items-center justify-center rounded-xl px-1 text-[11px] font-bold tracking-wide ${
-              active
-                ? "bg-card text-ink shadow-sm"
-                : "text-muted"
+            className={`flex min-h-11 items-center justify-center rounded-xl px-1 text-[11px] font-extrabold tracking-wide ${
+              active ? "bg-chile text-black" : "text-muted"
             }`}
           >
             {opt.id !== "all" ? (
               <span
                 className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
-                  opt.id === "glendale" ? "bg-glendale" : "bg-avondale"
+                  active ? "bg-black" : opt.id === "glendale" ? "bg-glendale" : "bg-avondale"
                 }`}
               />
             ) : null}

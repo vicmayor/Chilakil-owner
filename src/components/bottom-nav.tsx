@@ -17,7 +17,7 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-black/95 backdrop-blur-md"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="mx-auto grid max-w-lg grid-cols-5">
@@ -43,7 +43,7 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
               >
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
                 {tab.href === "/messages" && inboxCount > 0 ? (
-                  <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-chile px-1 text-[10px] leading-4 text-white">
+                  <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-chile px-1 text-[10px] font-extrabold leading-4 text-black">
                     {inboxCount}
                   </span>
                 ) : null}

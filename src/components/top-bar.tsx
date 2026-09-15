@@ -1,5 +1,6 @@
 import { COMBINED_BANNER, isCombinedScope, type LocationScope } from "@/lib/location";
 import { LocationSwitcher } from "@/components/location-switcher";
+import { BrandLogo } from "@/components/brand-logo";
 
 export function TopBar({
   title,
@@ -12,14 +13,17 @@ export function TopBar({
 }) {
   return (
     <header
-      className="sticky top-0 z-20 border-b border-line/80 bg-paper/90 px-4 pb-3 backdrop-blur-md"
+      className="sticky top-0 z-20 border-b border-line bg-black/95 px-4 pb-3 backdrop-blur-md"
       style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
     >
       <div className="mx-auto max-w-lg">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-chile">
-          Chilakil Owner
-        </p>
-        <h1 className="font-display mt-0.5 text-2xl font-semibold tracking-tight">{title}</h1>
+        <div className="flex items-center justify-between gap-3">
+          <BrandLogo size="header" />
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-chile">
+            Owner
+          </p>
+        </div>
+        <h1 className="font-display mt-3 text-2xl font-extrabold tracking-tight">{title}</h1>
         {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
         <div className="mt-3">
           <LocationSwitcher value={scope} />

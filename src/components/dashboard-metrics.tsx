@@ -43,7 +43,7 @@ export function DashboardMetrics({ data }: { data: DashboardData }) {
   if (isCombinedScope(data.scope) && data.combined) {
     return (
       <div className="space-y-3">
-        <div className="rounded-2xl border border-chile/20 bg-card p-4">
+        <div className="rounded-2xl border border-chile/40 bg-card p-4">
           <Block m={data.combined} combined />
         </div>
         {data.locations.map((m) => (

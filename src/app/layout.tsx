@@ -1,17 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Fraunces } from "next/font/google";
+import { Figtree } from "next/font/google";
 import "./globals.css";
 
 const figtree = Figtree({
   variable: "--font-figtree",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -36,16 +30,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#b1321c",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${figtree.variable} ${fraunces.variable} h-full antialiased`}
-    >
-      <body className="min-h-full bg-paper font-sans text-ink">{children}</body>
+    <html lang="en" className={`${figtree.variable} h-full antialiased`}>
+      <body className="min-h-full bg-brand font-sans text-ink">{children}</body>
     </html>
   );
 }

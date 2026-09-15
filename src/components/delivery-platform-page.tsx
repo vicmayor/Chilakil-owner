@@ -95,7 +95,7 @@ export async function DeliveryPlatformPage({
                 </div>
               </dl>
               {integration ? (
-                <p className="mt-3 rounded-xl bg-paper px-3 py-2 text-xs text-muted">
+                <p className="mt-3 rounded-xl bg-paper-2 px-3 py-2 text-xs text-muted">
                   Integration: {integration.status}. Secret ref{" "}
                   <span className="font-medium text-ink">{integration.secretRef}</span>
                   {integration.storeRef ? ` · store ref ${integration.storeRef}` : ""}. No live
@@ -112,7 +112,7 @@ export async function DeliveryPlatformPage({
             {dates.map((date) => {
               const rows = summaries.filter((s) => s.date === date);
               return (
-                <li key={date} className="rounded-xl bg-paper px-3 py-2 text-sm">
+                <li key={date} className="rounded-xl bg-paper-2 px-3 py-2 text-sm">
                   <p className="text-xs font-semibold text-muted">{formatShortDate(date)}</p>
                   {ids.map((id) => {
                     const row = rows.find((r) => r.locationId === id);
