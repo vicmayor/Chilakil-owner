@@ -7,7 +7,7 @@ export function BrandLogo({
 }) {
   const dims =
     size === "header"
-      ? "h-8 w-auto max-w-[148px] object-contain object-left"
+      ? "h-11 w-auto max-w-[196px] object-contain object-left"
       : "h-auto w-full max-w-[340px] object-contain object-left";
   return (
     // Official lockup is designed on black — keep that plate behind the asset.
