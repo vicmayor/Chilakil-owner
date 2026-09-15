@@ -64,7 +64,7 @@ export default async function MorePage() {
         <form action={logoutAction}>
           <button
             type="submit"
-            className="flex w-full items-center justify-center rounded-2xl border border-line bg-card text-sm font-semibold"
+            className="flex w-full items-center justify-center rounded-2xl border border-line bg-card text-sm font-semibold text-ink"
           >
             Sign out
           </button>

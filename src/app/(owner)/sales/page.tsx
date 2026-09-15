@@ -80,7 +80,7 @@ export default async function SalesPage() {
             {dates.map((date) => {
               const rows = daily.filter((r) => r.date === date);
               return (
-                <li key={date} className="rounded-xl bg-paper px-3 py-2">
+                <li key={date} className="rounded-xl bg-paper-2 px-3 py-2">
                   <p className="text-xs font-semibold text-muted">{formatShortDate(date)}</p>
                   {ids.map((id) => {
                     const slice = rows.filter((r) => r.locationId === id);

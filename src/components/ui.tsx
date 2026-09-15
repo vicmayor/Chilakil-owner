@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-line bg-card p-4 shadow-[0_1px_0_rgba(26,20,16,0.04)] ${className}`}
+      className={`rounded-2xl border border-line bg-card p-4 ${className}`}
     >
       {children}
     </section>
@@ -48,7 +48,7 @@ export function Metric({
 
 export function CombinedBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-paper-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+    <span className="inline-flex items-center rounded-full bg-chile px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-black">
       Combined
     </span>
   );

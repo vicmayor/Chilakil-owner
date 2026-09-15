@@ -1,35 +1,38 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-paper: #f3ece3;
-  --color-paper-2: #e8dfd2;
-  --color-card: #fffbf6;
-  --color-ink: #1a1410;
-  --color-muted: #6b5f55;
-  --color-chile: #b1321c;
-  --color-chile-dark: #8a2414;
-  --color-mesa: #c4a574;
-  --color-sage: #2c6a4a;
-  --color-sage-soft: #e3f0e8;
-  --color-warn: #9a3412;
-  --color-warn-soft: #fde8d8;
-  --color-danger: #9f1239;
-  --color-danger-soft: #fce7ef;
-  --color-line: #ddd2c3;
-  --color-glendale: #b1321c;
-  --color-avondale: #b45309;
+  --color-brand: #000000;
+  --color-brand-yellow: #fcc444;
+  --color-paper: #000000;
+  --color-paper-2: #1a1a1a;
+  --color-card: #141414;
+  --color-ink: #ffffff;
+  --color-muted: #a3a3a3;
+  --color-chile: #fcc444;
+  --color-chile-dark: #d4a01e;
+  --color-mesa: #fcc444;
+  --color-sage: #4ade80;
+  --color-sage-soft: #10291a;
+  --color-warn: #fcc444;
+  --color-warn-soft: #2a2108;
+  --color-danger: #fb7185;
+  --color-danger-soft: #3a1018;
+  --color-line: #2a2a2a;
+  --color-glendale: #fcc444;
+  --color-avondale: #ffffff;
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-display: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
   -webkit-tap-highlight-color: transparent;
   height: 100%;
+  color-scheme: dark;
 }
 
 body {
   min-height: 100%;
-  background: var(--color-paper);
+  background: var(--color-brand);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
@@ -42,12 +45,18 @@ select {
   min-height: 44px;
 }
 
+input,
+textarea {
+  color: var(--color-ink);
+}
+
 textarea {
   min-height: 120px;
 }
 
 ::selection {
-  background: #f0c9bf;
+  background: #fcc444;
+  color: #000000;
 }
 
 .tabular {

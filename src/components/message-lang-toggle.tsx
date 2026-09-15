@@ -8,7 +8,7 @@ export function MessageLangToggle({ lang }: { lang: "en" | "es" }) {
       <Link
         href="/messages?lang=en"
         className={`flex items-center justify-center rounded-xl text-sm font-semibold ${
-          lang === "en" ? "bg-card shadow-sm" : "text-muted"
+          lang === "en" ? "bg-chile font-extrabold text-black" : "text-muted"
         }`}
       >
         English
@@ -16,7 +16,7 @@ export function MessageLangToggle({ lang }: { lang: "en" | "es" }) {
       <Link
         href="/messages?lang=es"
         className={`flex items-center justify-center rounded-xl text-sm font-semibold ${
-          lang === "es" ? "bg-card shadow-sm" : "text-muted"
+          lang === "es" ? "bg-chile font-extrabold text-black" : "text-muted"
         }`}
       >
         Español
