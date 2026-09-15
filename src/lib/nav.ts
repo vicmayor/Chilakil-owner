@@ -3,7 +3,7 @@ import {
   Bike,
   BookOpen,
   ClipboardList,
-  LayoutDashboard,
+  Home,
   Megaphone,
   MessageSquare,
   Receipt,
@@ -24,7 +24,7 @@ export type AppModule = {
 };
 
 export const MODULES: AppModule[] = [
-  { href: "/dashboard", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard, group: "home" },
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Home", icon: Home, group: "home" },
   { href: "/sales", label: "Sales", shortLabel: "Sales", icon: ClipboardList, group: "money" },
   { href: "/doordash", label: "DoorDash", shortLabel: "Dash", icon: Bike, group: "money" },
   { href: "/ubereats", label: "Uber Eats", shortLabel: "Uber", icon: UtensilsCrossed, group: "money" },

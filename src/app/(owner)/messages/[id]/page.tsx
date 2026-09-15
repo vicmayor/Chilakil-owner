@@ -75,7 +75,9 @@ export default async function MessageDetailPage({
             <span className="rounded-full bg-paper-2 px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
               {message.category}
             </span>
-            {flags.map((f) => (
+            {flags
+              .filter((f) => f.replace("_", " ") !== message.category)
+              .map((f) => (
               <span key={f} className="rounded-full bg-paper-2 px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
                 {f.replace("_", " ")}
               </span>

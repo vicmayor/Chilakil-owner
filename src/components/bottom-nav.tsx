@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Grid2X2, LayoutDashboard, MessageSquare, ClipboardList, Sparkles } from "lucide-react";
+import { Grid2X2, Home, MessageSquare, ClipboardList, Sparkles } from "lucide-react";
 
 const TABS = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/sales", label: "Sales", icon: ClipboardList },
   { href: "/messages", label: "Inbox", icon: MessageSquare },
   { href: "/assistant", label: "Ask", icon: Sparkles },
