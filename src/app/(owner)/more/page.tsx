@@ -57,7 +57,8 @@ export default async function MorePage() {
           </ul>
           <p className="mt-2 text-xs leading-5 text-muted">
             Phase 1 never stores API keys in the database and never calls DoorDash, Uber Eats,
-            Grubhub, Square, Meta, or the bank. Put values only in env vars when you are ready.
+            Grubhub, Square, Meta, Google Ads, TikTok, or the bank. Put values only in env vars
+            when you are ready.
           </p>
         </section>
 

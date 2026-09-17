@@ -2,13 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { BUSINESS_WIDE_LABEL, COMBINED_LABEL, locationIdsForScope } from "./location";
 import {
+  buildPaidAdsBundle,
   businessWideCampaigns,
+  campaignsForPlatform,
   campaignsForScope,
   campaignScopeLabel,
   clickThroughRate,
   costPerResult,
+  GOOGLE_ADS_PLATFORM,
+  isPaidAdPlatform,
+  META_PLATFORM,
   storeCampaigns,
   sumDailyStats,
+  TIKTOK_PLATFORM,
 } from "./marketing";
 
 const glendaleLunch = { id: "g1", locationId: "glendale" as const, name: "Glendale lunch specials" };
@@ -50,6 +56,64 @@ test("store totals exclude business-wide so brand spend is never silently attrib
   assert.equal(brandOnly.length, 1);
   assert.equal(brandOnly[0]?.locationId, null);
   assert.equal(campaignScopeLabel(brandOnly[0]?.locationId ?? null), BUSINESS_WIDE_LABEL);
+});
+
+test("paid platforms are meta, google, and tiktok — organic google is not a paid tab", () => {
+  assert.equal(isPaidAdPlatform("meta"), true);
+  assert.equal(isPaidAdPlatform("google"), true);
+  assert.equal(isPaidAdPlatform("tiktok"), true);
+  assert.equal(isPaidAdPlatform("google_business"), false);
+  assert.equal(isPaidAdPlatform("sms"), false);
+  const mixed = [
+    { platform: META_PLATFORM },
+    { platform: GOOGLE_ADS_PLATFORM },
+    { platform: TIKTOK_PLATFORM },
+    { platform: "sms" },
+  ];
+  assert.deepEqual(
+    campaignsForPlatform(mixed, "google").map((c) => c.platform),
+    ["google"],
+  );
+});
+
+test("Google/TikTok bundles keep business-wide out of store spend", () => {
+  const campaigns = [
+    {
+      id: "g-search",
+      locationId: "glendale",
+      name: "Glendale tacos near me",
+      channel: "search",
+      status: "active",
+      startDate: "2026-09-01",
+      endDate: null,
+      resultType: "purchases",
+      notes: null,
+    },
+    {
+      id: "brand-search",
+      locationId: null,
+      name: "Chilakil brand search",
+      channel: "search",
+      status: "active",
+      startDate: "2026-09-01",
+      endDate: null,
+      resultType: "reach",
+      notes: null,
+    },
+  ];
+  const bundle = buildPaidAdsBundle(
+    campaigns,
+    [
+      { campaignId: "g-search", date: "2026-09-16", spend: 22.4, reach: 420, impressions: 1800, clicks: 64, results: 3 },
+      { campaignId: "brand-search", date: "2026-09-16", spend: 14, reach: 900, impressions: 2400, clicks: 40, results: 0 },
+    ],
+    ["glendale", "avondale"],
+    "2026-09-16",
+  );
+  assert.equal(bundle.storeToday.spend, 22.4);
+  assert.equal(bundle.businessToday.spend, 14);
+  assert.equal(bundle.byLocationToday.find((r) => r.id === "glendale")?.totals.spend, 22.4);
+  assert.equal(bundle.byLocationToday.find((r) => r.id === "avondale")?.totals.spend, 0);
 });
 
 test("daily Meta stats add spend, reach, clicks, and results", () => {

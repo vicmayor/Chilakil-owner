@@ -49,6 +49,18 @@ export function platformLabel(platform: string): string {
       return "Grubhub";
     case "google":
       return "Google";
+    case "google_ads":
+      return "Google Ads";
+    case "google_business":
+      return "Google Business";
+    case "search":
+      return "Search";
+    case "maps":
+      return "Maps";
+    case "youtube":
+      return "YouTube";
+    case "tiktok":
+      return "TikTok";
     case "yelp":
       return "Yelp";
     case "instagram":
@@ -101,6 +113,8 @@ export function resultTypeLabel(resultType: string | null | undefined): string {
       return "Link clicks";
     case "reach":
       return "Reach";
+    case "video_views":
+      return "Video views";
     default:
       return resultType ? resultType.replace(/_/g, " ") : "Results";
   }
