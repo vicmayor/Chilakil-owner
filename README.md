@@ -9,7 +9,7 @@ Mobile-first owner app for **Chilakil To Go**. Two operations are tracked as sep
 
 The location switcher (**ALL / GLENDALE / AVONDALE**) sits on every financial screen. **ALL** shows each location labeled, plus optional totals marked **Combined total (Glendale + Avondale)**. A single location shows only that store.
 
-This is **Phase 1**: UI, SQLite schema, seed data, auth shell, and an assistant that reads the local database. There are **no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank API calls**. Integration rows store env var *names* (`secretRef`), never secret values.
+This is **Phase 1**: UI, SQLite schema, seed data, auth shell, and an assistant that reads the local database. There are **no live DoorDash, Uber Eats, Grubhub, Square, Meta, Google Ads, TikTok, or bank API calls**. Integration rows store env var *names* (`secretRef`), never secret values.
 
 ## Run locally
 
@@ -71,7 +71,7 @@ Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid
 8. Menu & Recipes
 9. Customer Messages — EN/ES chrome; sensitive types require owner Approve / Edit / Reject
 10. Reviews
-11. Marketing
+11. Marketing — Meta / Google / TikTok sample spend/reach/clicks/results by location (live ad APIs are Phase 2)
 12. Employees
 13. AI Assistant — queries seeded data; respects the location filter
 
@@ -96,8 +96,10 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `DailyOps` — labor hours/cost, theoretical food cost, actual purchases, targets
 - `Expense`, `Ingredient`, `Recipe`, `RecipeIngredient`, `MenuItem`
 - `CustomerMessage` — `language` `en|es`, sensitivity flags, draft/approved reply
-- `Review`, `MarketingCampaign`, `Employee`, `Shift`
-- `IntegrationConfig` — `secretRef` env var name only
+- `Review`, `MarketingCampaign` (`platform` `meta|google|tiktok`, `reach`, `results`, `resultType`; `locationId` null = business-wide)
+- `AdDailyStats` — per-campaign daily spend/reach/impressions/clicks/results for Meta, Google Ads, and TikTok (seeded; no live API)
+- `Employee`, `Shift`
+- `IntegrationConfig` — `secretRef` env var name only. Paid ads: `META_*`, `GOOGLE_ADS_*`, `TIKTOK_*`
 - `Alert`, `AiThread`, `AiMessage`, `User`
 
 Seed covers **today (America/Phoenix)** plus four prior days for both locations, with deliberately different volume so switching ALL / GLENDALE / AVONDALE is obvious.
@@ -113,9 +115,34 @@ Today’s seeded shape (Phoenix “today”, not a fixed calendar date):
 | Theoretical food | $1,694.33 | $773.99 |
 | Orders | 127 | 61 |
 
+Today’s seeded paid ads (sample, not live):
+
+| | Glendale | Avondale | Business-wide (ALL only) |
+| --- | --- | --- | --- |
+| Meta | $79.70 | $30.15 | $35.00 |
+| Google Ads | $37.50 | $8.25 | $14.00 |
+| TikTok | $16.80 | $9.50 | $12.00 |
+
 ## Env vars
 
-See `.env.example`. Required for local run: `DATABASE_URL`, `AUTH_SECRET` (or `NEXTAUTH_SECRET`). Optional: `OPENAI_API_KEY`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
+See `.env.example`. Required for local run: `DATABASE_URL`, `AUTH_SECRET` (or `NEXTAUTH_SECRET`). Optional: `OPENAI_API_KEY`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `GOOGLE_ADS_*`, `TIKTOK_*`, `BANKING_*`.
+
+### Paid ads (Phase 1 placeholders)
+
+Marketing is a phone hub with **META / GOOGLE / TIKTOK** tabs. Each tab shows **seeded** campaigns so ALL / GLENDALE / AVONDALE changes the numbers. There are **no live Meta, Google Ads, or TikTok API calls**.
+
+| Env var | Used as |
+| --- | --- |
+| `META_GLENDALE_ACCESS_TOKEN` / `META_AVONDALE_ACCESS_TOKEN` | Meta `secretRef` |
+| `META_AD_ACCOUNT_ID` | Meta `storeRef` (shared ad account) |
+| `GOOGLE_ADS_GLENDALE_ACCESS_TOKEN` / `GOOGLE_ADS_AVONDALE_ACCESS_TOKEN` | Google Ads `secretRef` |
+| `GOOGLE_ADS_CUSTOMER_ID` | Google Ads `storeRef` |
+| `TIKTOK_GLENDALE_ACCESS_TOKEN` / `TIKTOK_AVONDALE_ACCESS_TOKEN` | TikTok `secretRef` |
+| `TIKTOK_ADVERTISER_ID` | TikTok `storeRef` |
+
+Leave them blank until Phase 2. Never put token values in the database.
+
+Business-wide campaigns (`locationId` null) appear **only on ALL**, labeled **Business-wide**. They are never attributed to Glendale or Avondale.
 
 ## Tests
 

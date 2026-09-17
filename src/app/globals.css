@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme inline {
+  --color-brand: #000000;
+  --color-brand-yellow: #fcc444;
   --color-paper: #f3ece3;
   --color-paper-2: #e8dfd2;
   --color-card: #fffbf6;

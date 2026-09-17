@@ -23,6 +23,7 @@ async function main() {
   await prisma.integrationConfig.deleteMany();
   await prisma.shift.deleteMany();
   await prisma.employee.deleteMany();
+  await prisma.adDailyStats.deleteMany();
   await prisma.marketingCampaign.deleteMany();
   await prisma.review.deleteMany();
   await prisma.customerMessage.deleteMany();
@@ -1007,25 +1008,81 @@ async function seedInboxAndReviews() {
   });
 }
 
+type AdDay = {
+  offset: number;
+  spend: number;
+  reach: number;
+  impressions: number;
+  clicks: number;
+  results: number;
+};
+
+async function seedPaidCampaign(
+  today: string,
+  row: {
+    locationId: string | null;
+    name: string;
+    channel: string;
+    platform: "meta" | "google" | "tiktok";
+    status: string;
+    startOffset: number;
+    endOffset?: number;
+    resultType: string;
+    notes: string;
+    days: AdDay[];
+  },
+) {
+  const totals = row.days.reduce(
+    (acc, day) => ({
+      spend: acc.spend + day.spend,
+      reach: acc.reach + day.reach,
+      impressions: acc.impressions + day.impressions,
+      clicks: acc.clicks + day.clicks,
+      results: acc.results + day.results,
+    }),
+    { spend: 0, reach: 0, impressions: 0, clicks: 0, results: 0 },
+  );
+
+  const campaign = await prisma.marketingCampaign.create({
+    data: {
+      locationId: row.locationId,
+      name: row.name,
+      channel: row.channel,
+      platform: row.platform,
+      status: row.status,
+      startDate: shiftIsoDate(today, row.startOffset),
+      endDate: row.endOffset == null ? null : shiftIsoDate(today, row.endOffset),
+      spend: round2(totals.spend),
+      reach: totals.reach,
+      impressions: totals.impressions,
+      clicks: totals.clicks,
+      results: totals.results,
+      resultType: row.resultType,
+      notes: row.notes,
+    },
+  });
+
+  await prisma.adDailyStats.createMany({
+    data: row.days.map((day) => ({
+      campaignId: campaign.id,
+      date: shiftIsoDate(today, day.offset),
+      spend: day.spend,
+      reach: day.reach,
+      impressions: day.impressions,
+      clicks: day.clicks,
+      results: day.results,
+    })),
+  });
+}
+
 async function seedMarketing(today: string) {
   await prisma.marketingCampaign.createMany({
     data: [
       {
         locationId: GLENDALE,
-        name: "Camelback lunch specials",
-        channel: "instagram",
-        status: "active",
-        startDate: shiftIsoDate(today, -10),
-        endDate: shiftIsoDate(today, 4),
-        spend: 180,
-        impressions: 24100,
-        clicks: 640,
-        notes: "Stories + reel of pastor trompo. Glendale only.",
-      },
-      {
-        locationId: GLENDALE,
         name: "Google Business posts",
         channel: "google",
+        platform: "google_business",
         status: "active",
         startDate: shiftIsoDate(today, -20),
         spend: 0,
@@ -1035,34 +1092,255 @@ async function seedMarketing(today: string) {
       },
       {
         locationId: AVONDALE,
-        name: "Trailer tonight geo-fence",
-        channel: "facebook",
-        status: "active",
-        startDate: today,
-        endDate: today,
-        spend: 45,
-        impressions: 8200,
-        clicks: 210,
-        notes: "1-mile radius around Civic Center. Avondale spend only.",
-      },
-      {
-        locationId: AVONDALE,
         name: "SMS: trailer hours",
         channel: "sms",
+        platform: "sms",
         status: "scheduled",
         startDate: shiftIsoDate(today, 1),
         spend: 22,
         notes: "Opt-in list for Avondale regulars.",
       },
-      {
-        locationId: null,
-        name: "Brand: Chilakil To Go awareness",
-        channel: "instagram",
-        status: "draft",
-        startDate: shiftIsoDate(today, 7),
-        spend: 0,
-        notes: "Brand-level creative. No location spend until you assign it.",
-      },
+    ],
+  });
+
+  // Glendale spend is larger and lunch-weighted so the location switcher is obvious.
+  await seedPaidCampaign(today, {
+    platform: "meta",
+    locationId: GLENDALE,
+    name: "Glendale lunch specials",
+    channel: "instagram",
+    status: "active",
+    startOffset: -10,
+    endOffset: 4,
+    resultType: "purchases",
+    notes: "Reels + stories of pastor trompo. Glendale restaurant only.",
+    days: [
+      { offset: 0, spend: 48.2, reach: 2100, impressions: 6200, clicks: 86, results: 4 },
+      { offset: -1, spend: 41.1, reach: 1900, impressions: 5400, clicks: 71, results: 3 },
+      { offset: -2, spend: 52.8, reach: 2400, impressions: 7100, clicks: 94, results: 5 },
+      { offset: -3, spend: 22.4, reach: 1100, impressions: 3100, clicks: 38, results: 1 },
+      { offset: -4, spend: 38.6, reach: 1800, impressions: 4900, clicks: 62, results: 2 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "meta",
+    locationId: GLENDALE,
+    name: "Camelback weekend boost",
+    channel: "facebook",
+    status: "active",
+    startOffset: -6,
+    endOffset: 1,
+    resultType: "link_clicks",
+    notes: "Traffic to Glendale Google listing and menu. Not the trailer.",
+    days: [
+      { offset: 0, spend: 31.5, reach: 3400, impressions: 9800, clicks: 142, results: 142 },
+      { offset: -1, spend: 28.0, reach: 3100, impressions: 8700, clicks: 121, results: 121 },
+      { offset: -2, spend: 44.25, reach: 4100, impressions: 12100, clicks: 188, results: 188 },
+      { offset: -3, spend: 19.8, reach: 2200, impressions: 6100, clicks: 74, results: 74 },
+      { offset: -4, spend: 26.4, reach: 2700, impressions: 7400, clicks: 96, results: 96 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "meta",
+    locationId: GLENDALE,
+    name: "Glendale catering leads",
+    channel: "facebook",
+    status: "paused",
+    startOffset: -14,
+    resultType: "leads",
+    notes: "Paused after last week's office-park form fills. Glendale kitchen only.",
+    days: [
+      { offset: 0, spend: 0, reach: 0, impressions: 0, clicks: 0, results: 0 },
+      { offset: -1, spend: 0, reach: 0, impressions: 0, clicks: 0, results: 0 },
+      { offset: -2, spend: 18.0, reach: 860, impressions: 2400, clicks: 41, results: 6 },
+      { offset: -3, spend: 21.5, reach: 940, impressions: 2700, clicks: 48, results: 7 },
+      { offset: -4, spend: 16.75, reach: 720, impressions: 2100, clicks: 33, results: 4 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "meta",
+    locationId: AVONDALE,
+    name: "Trailer tonight geo-fence",
+    channel: "facebook",
+    status: "active",
+    startOffset: 0,
+    endOffset: 0,
+    resultType: "reach",
+    notes: "1-mile radius around Civic Center. Avondale spend only.",
+    days: [
+      { offset: 0, spend: 18.75, reach: 4200, impressions: 5100, clicks: 64, results: 0 },
+      { offset: -1, spend: 16.2, reach: 3800, impressions: 4600, clicks: 51, results: 0 },
+      { offset: -2, spend: 21.4, reach: 4700, impressions: 5800, clicks: 73, results: 0 },
+      { offset: -3, spend: 12.0, reach: 2600, impressions: 3100, clicks: 34, results: 0 },
+      { offset: -4, spend: 19.5, reach: 4000, impressions: 4900, clicks: 58, results: 0 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "meta",
+    locationId: AVONDALE,
+    name: "Avondale after-game tacos",
+    channel: "instagram",
+    status: "active",
+    startOffset: -8,
+    endOffset: 3,
+    resultType: "messages",
+    notes: "DM the trailer for wait time. Avondale Instagram only.",
+    days: [
+      { offset: 0, spend: 11.4, reach: 980, impressions: 2400, clicks: 41, results: 9 },
+      { offset: -1, spend: 9.8, reach: 860, impressions: 2100, clicks: 33, results: 7 },
+      { offset: -2, spend: 14.25, reach: 1200, impressions: 2900, clicks: 52, results: 11 },
+      { offset: -3, spend: 7.5, reach: 640, impressions: 1500, clicks: 22, results: 4 },
+      { offset: -4, spend: 10.1, reach: 910, impressions: 2200, clicks: 37, results: 8 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "meta",
+    locationId: null,
+    name: "Chilakil To Go brand awareness",
+    channel: "instagram",
+    status: "active",
+    startOffset: -12,
+    resultType: "reach",
+    notes: "Business-wide creative for both operations. Shown on ALL only — never assigned to one store.",
+    days: [
+      { offset: 0, spend: 35.0, reach: 8900, impressions: 12400, clicks: 110, results: 0 },
+      { offset: -1, spend: 32.5, reach: 8200, impressions: 11600, clicks: 98, results: 0 },
+      { offset: -2, spend: 38.75, reach: 9400, impressions: 13200, clicks: 126, results: 0 },
+      { offset: -3, spend: 29.0, reach: 7600, impressions: 10800, clicks: 84, results: 0 },
+      { offset: -4, spend: 33.2, reach: 8500, impressions: 11900, clicks: 101, results: 0 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "google",
+    locationId: GLENDALE,
+    name: "Glendale tacos near me",
+    channel: "search",
+    status: "active",
+    startOffset: -14,
+    resultType: "purchases",
+    notes: "Search keywords for the Camelback restaurant. Not the trailer.",
+    days: [
+      { offset: 0, spend: 22.4, reach: 420, impressions: 1800, clicks: 64, results: 3 },
+      { offset: -1, spend: 19.8, reach: 380, impressions: 1600, clicks: 55, results: 2 },
+      { offset: -2, spend: 24.1, reach: 460, impressions: 1950, clicks: 71, results: 4 },
+      { offset: -3, spend: 16.25, reach: 310, impressions: 1320, clicks: 42, results: 1 },
+      { offset: -4, spend: 20.5, reach: 390, impressions: 1700, clicks: 58, results: 2 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "google",
+    locationId: GLENDALE,
+    name: "Camelback lunch keywords",
+    channel: "search",
+    status: "active",
+    startOffset: -8,
+    endOffset: 6,
+    resultType: "link_clicks",
+    notes: "Menu + hours clicks for Glendale. Maps sitelink.",
+    days: [
+      { offset: 0, spend: 15.1, reach: 280, impressions: 940, clicks: 41, results: 41 },
+      { offset: -1, spend: 13.4, reach: 250, impressions: 860, clicks: 36, results: 36 },
+      { offset: -2, spend: 17.75, reach: 320, impressions: 1100, clicks: 49, results: 49 },
+      { offset: -3, spend: 11.2, reach: 210, impressions: 720, clicks: 28, results: 28 },
+      { offset: -4, spend: 14.0, reach: 260, impressions: 890, clicks: 38, results: 38 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "google",
+    locationId: AVONDALE,
+    name: "Avondale trailer hours",
+    channel: "search",
+    status: "active",
+    startOffset: -5,
+    resultType: "link_clicks",
+    notes: "Civic Center trailer queries only. Avondale spend.",
+    days: [
+      { offset: 0, spend: 8.25, reach: 180, impressions: 720, clicks: 31, results: 31 },
+      { offset: -1, spend: 7.1, reach: 150, impressions: 610, clicks: 26, results: 26 },
+      { offset: -2, spend: 9.4, reach: 200, impressions: 790, clicks: 35, results: 35 },
+      { offset: -3, spend: 6.0, reach: 120, impressions: 480, clicks: 18, results: 18 },
+      { offset: -4, spend: 7.8, reach: 160, impressions: 650, clicks: 24, results: 24 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "google",
+    locationId: null,
+    name: "Chilakil To Go brand search",
+    channel: "search",
+    status: "active",
+    startOffset: -18,
+    resultType: "reach",
+    notes: "Business-wide brand terms. Shown on ALL only — never assigned to one store.",
+    days: [
+      { offset: 0, spend: 14.0, reach: 900, impressions: 2400, clicks: 40, results: 0 },
+      { offset: -1, spend: 12.5, reach: 820, impressions: 2100, clicks: 34, results: 0 },
+      { offset: -2, spend: 15.75, reach: 980, impressions: 2600, clicks: 46, results: 0 },
+      { offset: -3, spend: 11.2, reach: 740, impressions: 1900, clicks: 29, results: 0 },
+      { offset: -4, spend: 13.4, reach: 860, impressions: 2200, clicks: 37, results: 0 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "tiktok",
+    locationId: GLENDALE,
+    name: "Pastor trompo sound-on",
+    channel: "tiktok",
+    status: "active",
+    startOffset: -9,
+    endOffset: 5,
+    resultType: "video_views",
+    notes: "Spark-style cut of the Glendale trompo. Restaurant only.",
+    days: [
+      { offset: 0, spend: 16.8, reach: 6200, impressions: 14000, clicks: 210, results: 2 },
+      { offset: -1, spend: 14.2, reach: 5400, impressions: 12100, clicks: 176, results: 1 },
+      { offset: -2, spend: 18.5, reach: 7100, impressions: 15800, clicks: 248, results: 3 },
+      { offset: -3, spend: 11.4, reach: 4300, impressions: 9600, clicks: 132, results: 1 },
+      { offset: -4, spend: 15.0, reach: 5800, impressions: 13200, clicks: 194, results: 2 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "tiktok",
+    locationId: AVONDALE,
+    name: "Trailer after dark",
+    channel: "tiktok",
+    status: "active",
+    startOffset: -6,
+    resultType: "messages",
+    notes: "In-feed for Civic Center nights. Avondale DMs only.",
+    days: [
+      { offset: 0, spend: 9.5, reach: 4100, impressions: 8900, clicks: 156, results: 5 },
+      { offset: -1, spend: 8.2, reach: 3600, impressions: 7800, clicks: 128, results: 4 },
+      { offset: -2, spend: 11.1, reach: 4700, impressions: 10200, clicks: 181, results: 6 },
+      { offset: -3, spend: 6.75, reach: 2900, impressions: 6100, clicks: 94, results: 2 },
+      { offset: -4, spend: 8.8, reach: 3800, impressions: 8400, clicks: 141, results: 3 },
+    ],
+  });
+
+  await seedPaidCampaign(today, {
+    platform: "tiktok",
+    locationId: null,
+    name: "Chilakil To Go recipe duet",
+    channel: "tiktok",
+    status: "active",
+    startOffset: -11,
+    resultType: "video_views",
+    notes: "Business-wide recipe duet. Shown on ALL only — never assigned to one store.",
+    days: [
+      { offset: 0, spend: 12.0, reach: 9800, impressions: 17600, clicks: 190, results: 0 },
+      { offset: -1, spend: 10.5, reach: 8600, impressions: 15400, clicks: 162, results: 0 },
+      { offset: -2, spend: 13.4, reach: 10400, impressions: 18900, clicks: 214, results: 0 },
+      { offset: -3, spend: 9.25, reach: 7400, impressions: 13200, clicks: 141, results: 0 },
+      { offset: -4, spend: 11.2, reach: 9100, impressions: 16100, clicks: 178, results: 0 },
     ],
   });
 }
@@ -1073,13 +1351,17 @@ async function seedIntegrations() {
     [GLENDALE, "ubereats", "UBEREATS_GLENDALE_CLIENT_SECRET", "UBEREATS_GLENDALE_STORE_ID"],
     [GLENDALE, "grubhub", "GRUBHUB_GLENDALE_API_KEY", "GRUBHUB_GLENDALE_STORE_ID"],
     [GLENDALE, "square", "SQUARE_GLENDALE_ACCESS_TOKEN", "SQUARE_GLENDALE_LOCATION_ID"],
-    [GLENDALE, "meta", "META_GLENDALE_PAGE_TOKEN", null],
+    [GLENDALE, "meta", "META_GLENDALE_ACCESS_TOKEN", "META_AD_ACCOUNT_ID"],
+    [GLENDALE, "google", "GOOGLE_ADS_GLENDALE_ACCESS_TOKEN", "GOOGLE_ADS_CUSTOMER_ID"],
+    [GLENDALE, "tiktok", "TIKTOK_GLENDALE_ACCESS_TOKEN", "TIKTOK_ADVERTISER_ID"],
     [GLENDALE, "banking", "BANKING_GLENDALE_SECRET_REF", null],
     [AVONDALE, "doordash", "DOORDASH_AVONDALE_API_KEY", "DOORDASH_AVONDALE_STORE_ID"],
     [AVONDALE, "ubereats", "UBEREATS_AVONDALE_CLIENT_SECRET", "UBEREATS_AVONDALE_STORE_ID"],
     [AVONDALE, "grubhub", "GRUBHUB_AVONDALE_API_KEY", "GRUBHUB_AVONDALE_STORE_ID"],
     [AVONDALE, "square", "SQUARE_AVONDALE_ACCESS_TOKEN", "SQUARE_AVONDALE_LOCATION_ID"],
-    [AVONDALE, "meta", "META_AVONDALE_PAGE_TOKEN", null],
+    [AVONDALE, "meta", "META_AVONDALE_ACCESS_TOKEN", "META_AD_ACCOUNT_ID"],
+    [AVONDALE, "google", "GOOGLE_ADS_AVONDALE_ACCESS_TOKEN", "GOOGLE_ADS_CUSTOMER_ID"],
+    [AVONDALE, "tiktok", "TIKTOK_AVONDALE_ACCESS_TOKEN", "TIKTOK_ADVERTISER_ID"],
     [AVONDALE, "banking", "BANKING_AVONDALE_SECRET_REF", null],
   ] as const;
 

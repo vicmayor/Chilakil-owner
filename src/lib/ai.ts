@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { phoenixToday, shiftIsoDate } from "@/lib/dates";
 import { moneyExact, pct } from "@/lib/format";
 import {
+  BUSINESS_WIDE_LABEL,
   COMBINED_LABEL,
   isCombinedScope,
   locationIdsForScope,
@@ -9,11 +10,12 @@ import {
   type LocationScope,
 } from "@/lib/location";
 import { getDashboardData } from "@/lib/metrics";
+import { campaignsForScope, PAID_AD_PLATFORMS } from "@/lib/marketing";
 
 export type BusinessSnapshot = {
   generatedAt: string;
   timezone: "America/Phoenix";
-  source: "local SQLite seed — no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank APIs";
+  source: "local SQLite seed — no live DoorDash, Uber Eats, Grubhub, Square, Meta, Google Ads, TikTok, or bank APIs";
   scope: LocationScope;
   notice: string;
   today: Awaited<ReturnType<typeof getDashboardData>>;
@@ -63,6 +65,20 @@ export type BusinessSnapshot = {
     recipeCost: number;
     foodCostPct: number;
   }[];
+  paidAds: {
+    platform: string;
+    locationId: string | null;
+    scopeLabel: string;
+    name: string;
+    status: string;
+    channel: string;
+    todaySpend: number;
+    todayReach: number;
+    todayClicks: number;
+    todayResults: number;
+    resultType: string | null;
+    businessWide: boolean;
+  }[];
 };
 
 export async function buildSnapshot(scope: LocationScope): Promise<BusinessSnapshot> {
@@ -70,30 +86,35 @@ export async function buildSnapshot(scope: LocationScope): Promise<BusinessSnaps
   const ids = locationIdsForScope(scope);
   const today = await getDashboardData(scope, date);
 
-  const [sales, expenses, messages, reviews, shifts, menuItems] = await Promise.all([
-    prisma.dailySales.findMany({ where: { locationId: { in: ids }, date } }),
-    prisma.expense.findMany({ where: { locationId: { in: ids }, date } }),
-    prisma.customerMessage.findMany({
-      where: {
-        locationId: { in: ids },
-        status: { in: ["pending_approval", "new"] },
-      },
-      orderBy: { receivedAt: "desc" },
-    }),
-    prisma.review.findMany({
-      where: { locationId: { in: ids } },
-      orderBy: { reviewedAt: "desc" },
-      take: 12,
-    }),
-    prisma.shift.findMany({
-      where: { locationId: { in: ids }, date },
-      include: { employee: true },
-    }),
-    prisma.menuItem.findMany({
-      where: { locationId: { in: ids }, active: true },
-      include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
-    }),
-  ]);
+  const [sales, expenses, messages, reviews, shifts, menuItems, campaigns, metaDaily] =
+    await Promise.all([
+      prisma.dailySales.findMany({ where: { locationId: { in: ids }, date } }),
+      prisma.expense.findMany({ where: { locationId: { in: ids }, date } }),
+      prisma.customerMessage.findMany({
+        where: {
+          locationId: { in: ids },
+          status: { in: ["pending_approval", "new"] },
+        },
+        orderBy: { receivedAt: "desc" },
+      }),
+      prisma.review.findMany({
+        where: { locationId: { in: ids } },
+        orderBy: { reviewedAt: "desc" },
+        take: 12,
+      }),
+      prisma.shift.findMany({
+        where: { locationId: { in: ids }, date },
+        include: { employee: true },
+      }),
+      prisma.menuItem.findMany({
+        where: { locationId: { in: ids }, active: true },
+        include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
+      }),
+      prisma.marketingCampaign.findMany({
+        where: { platform: { in: [...PAID_AD_PLATFORMS] } },
+      }),
+      prisma.adDailyStats.findMany({ where: { date } }),
+    ]);
 
   const menuCosting = menuItems.map((item) => {
     const recipeCost =
@@ -111,13 +132,37 @@ export async function buildSnapshot(scope: LocationScope): Promise<BusinessSnaps
   });
 
   const notice = isCombinedScope(scope)
-    ? `${COMBINED_LABEL}. Per-location rows are listed separately — do not treat unlabeled numbers as a single store.`
-    : `Scope is ${LOCATIONS[scope].name} only. Do not include the other location.`;
+    ? `${COMBINED_LABEL}. Per-location rows are listed separately — do not treat unlabeled numbers as a single store. Business-wide paid campaigns are labeled ${BUSINESS_WIDE_LABEL} and are not a store.`
+    : `Scope is ${LOCATIONS[scope].name} only. Do not include the other location or business-wide paid-ad spend.`;
+
+  const adsScoped = campaignsForScope(campaigns, scope);
+  const paidAds = adsScoped.map((campaign) => {
+    const day = metaDaily.find((row) => row.campaignId === campaign.id);
+    const businessWide = campaign.locationId == null;
+    return {
+      platform: campaign.platform,
+      locationId: campaign.locationId,
+      scopeLabel: businessWide
+        ? BUSINESS_WIDE_LABEL
+        : campaign.locationId === "avondale"
+          ? "Avondale"
+          : "Glendale",
+      name: campaign.name,
+      status: campaign.status,
+      channel: campaign.channel,
+      todaySpend: day?.spend ?? 0,
+      todayReach: day?.reach ?? 0,
+      todayClicks: day?.clicks ?? 0,
+      todayResults: day?.results ?? 0,
+      resultType: campaign.resultType,
+      businessWide,
+    };
+  });
 
   return {
     generatedAt: new Date().toISOString(),
     timezone: "America/Phoenix",
-    source: "local SQLite seed — no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank APIs",
+    source: "local SQLite seed — no live DoorDash, Uber Eats, Grubhub, Square, Meta, Google Ads, TikTok, or bank APIs",
     scope,
     notice,
     today,
@@ -161,6 +206,7 @@ export async function buildSnapshot(scope: LocationScope): Promise<BusinessSnaps
       laborCost: s.laborCost,
     })),
     menuCosting,
+    paidAds,
   };
 }
 
@@ -206,6 +252,36 @@ export function deterministicAnswer(question: string, snapshot: BusinessSnapshot
         `• ${loc} · ${r.platform} · ${r.rating}★ · ${r.author}${r.responded ? " (replied)" : " (needs reply)"}`,
       );
       lines.push(`  ${r.text}`);
+    }
+    return lines.join("\n");
+  }
+
+  if (intent === "marketing") {
+    const store = snapshot.paidAds.filter((c) => !c.businessWide);
+    const brand = snapshot.paidAds.filter((c) => c.businessWide);
+    const storeSpend = store.reduce((s, c) => s + c.todaySpend, 0);
+    const brandSpend = brand.reduce((s, c) => s + c.todaySpend, 0);
+    lines.push("Paid ads (Meta, Google, TikTok) are seeded sample data — no live ad APIs.");
+    if (snapshot.today.combined) {
+      lines.push(`${COMBINED_LABEL} store paid-ad spend today: ${moneyExact(storeSpend)}.`);
+      if (brand.length) {
+        lines.push(
+          `${BUSINESS_WIDE_LABEL} paid-ad spend today: ${moneyExact(brandSpend)} — not Glendale or Avondale.`,
+        );
+      }
+    } else {
+      lines.push(`This location paid-ad spend today: ${moneyExact(storeSpend)}. Business-wide campaigns are hidden on a single store.`);
+    }
+    for (const platform of ["meta", "google", "tiktok"]) {
+      const rows = snapshot.paidAds.filter((c) => c.platform === platform);
+      if (!rows.length) continue;
+      const spend = rows.filter((c) => !c.businessWide).reduce((s, c) => s + c.todaySpend, 0);
+      lines.push(`${platform}: store spend ${moneyExact(spend)}.`);
+      for (const c of rows) {
+        lines.push(
+          `• ${c.scopeLabel} · ${c.name} · ${c.status} · ${c.channel} · spend ${moneyExact(c.todaySpend)} · reach ${c.todayReach} · clicks ${c.todayClicks} · ${c.resultType ?? "results"} ${c.todayResults}`,
+        );
+      }
     }
     return lines.join("\n");
   }
@@ -303,7 +379,7 @@ export function deterministicAnswer(question: string, snapshot: BusinessSnapshot
   }
 
   if (intent === "help" || q.length < 8) {
-    lines.push("You can ask about sales, net after fees, DoorDash / Uber Eats / Grubhub mix, labor, food cost, expenses, reviews, or messages that need approval.");
+    lines.push("You can ask about sales, net after fees, DoorDash / Uber Eats / Grubhub mix, Meta ads, labor, food cost, expenses, reviews, or messages that need approval.");
   }
 
   return lines.join("\n").trim();
@@ -311,7 +387,9 @@ export function deterministicAnswer(question: string, snapshot: BusinessSnapshot
 
 function detectIntent(q: string): string {
   if (/(message|inbox|approval|alerg|allerg|refund|cater)/.test(q)) return "messages";
-  if (/(review|yelp|google|star)/.test(q)) return "reviews";
+  if (/(review|yelp|google review|star)/.test(q)) return "reviews";
+  if (/(meta|tiktok|google ads|\bads\b|ad spend|campaign|facebook ad|instagram ad|marketing)/.test(q))
+    return "marketing";
   if (/(expense|vendor|shamrock|bill|spent)/.test(q)) return "expenses";
   if (/(food cost|cogs|recipe|ingredient|theoretical)/.test(q)) return "food";
   if (/(labor|wage|payroll|staff|shift|hours)/.test(q)) return "labor";
@@ -339,9 +417,10 @@ export async function llmAnswer(question: string, snapshot: BusinessSnapshot): P
       {
         role: "system",
         content: `You are the owner assistant for Chilakil To Go, a Mexican restaurant (Glendale) and food trailer (Avondale).
-Answer only from the JSON snapshot. Never invent live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank data.
+Answer only from the JSON snapshot. Never invent live DoorDash, Uber Eats, Grubhub, Square, Meta, Google Ads, TikTok, or bank data.
 If scope is a single location, do not quote the other location's numbers.
 When scope is ALL, always label Glendale vs Avondale, and label any sum as "${COMBINED_LABEL}".
+Business-wide Meta campaigns are labeled "${BUSINESS_WIDE_LABEL}" and must not be treated as a single store.
 Keep answers tight and useful on a phone: lead with numbers, then one recommendation.
 Today in the snapshot is ${phoenixToday()} (${shiftIsoDate(phoenixToday(), 0)}) America/Phoenix.`,
       },
@@ -360,6 +439,8 @@ export const SUGGESTED_QUESTIONS = [
   "What's our food cost vs target?",
   "Is labor over target?",
   "Break down DoorDash vs in-store",
+  "How are Meta ads doing today?",
+  "What did we spend on Google and TikTok ads?",
   "What needs my approval in messages?",
   "Compare Glendale and Avondale",
 ];

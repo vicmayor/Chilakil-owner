@@ -1,63 +1,75 @@
 import { prisma } from "@/lib/db";
 import { getLocationScope } from "@/lib/scope";
-import { locationIdsForScope, isCombinedScope } from "@/lib/location";
-import { formatShortDate } from "@/lib/dates";
-import { moneyExact, number, platformLabel } from "@/lib/format";
+import { locationIdsForScope } from "@/lib/location";
+import { phoenixToday, shiftIsoDate } from "@/lib/dates";
 import { TopBar } from "@/components/top-bar";
-import { Card, CombinedBadge, LocationDot } from "@/components/ui";
+import { MarketingHub } from "@/components/marketing-hub";
+import {
+  PAID_AD_PLATFORMS,
+  buildPaidAdsBundle,
+  campaignsForPlatform,
+  campaignsForScope,
+  isPaidAdPlatform,
+  type PaidAdPlatform,
+} from "@/lib/marketing";
 
 export const metadata = { title: "Marketing" };
 
 export default async function MarketingPage() {
   const scope = await getLocationScope();
   const ids = locationIdsForScope(scope);
-  const campaigns = await prisma.marketingCampaign.findMany({
-    where: {
-      OR: [{ locationId: { in: ids } }, { locationId: null }],
-    },
-    orderBy: { startDate: "desc" },
-  });
+  const today = phoenixToday();
+  const dates = [0, -1, -2, -3, -4].map((d) => shiftIsoDate(today, d));
 
-  const scoped = campaigns.filter((c) => {
-    if (c.locationId === null) return true;
-    return ids.includes(c.locationId as "glendale" | "avondale");
-  });
-  const spend = scoped
+  const [campaigns, dailyStats, integrations] = await Promise.all([
+    prisma.marketingCampaign.findMany({
+      orderBy: [{ status: "asc" }, { startDate: "desc" }],
+    }),
+    prisma.adDailyStats.findMany({
+      where: { date: { in: dates } },
+    }),
+    prisma.integrationConfig.findMany({
+      where: { locationId: { in: ids }, provider: { in: [...PAID_AD_PLATFORMS] } },
+    }),
+  ]);
+
+  const scoped = campaignsForScope(campaigns, scope);
+  const otherCampaigns = scoped.filter((c) => !isPaidAdPlatform(c.platform));
+  const otherSpend = otherCampaigns
     .filter((c) => c.locationId !== null)
     .reduce((s, c) => s + c.spend, 0);
 
+  const bundles = Object.fromEntries(
+    PAID_AD_PLATFORMS.map((platform) => [
+      platform,
+      buildPaidAdsBundle(campaignsForPlatform(scoped, platform), dailyStats, ids, today),
+    ]),
+  ) as Record<PaidAdPlatform, ReturnType<typeof buildPaidAdsBundle>>;
+
   return (
     <>
-      <TopBar title="Marketing" subtitle="Spend stays on the location that bought it" scope={scope} />
-      <main className="space-y-4 px-4 py-4">
-        <Card>
-          {isCombinedScope(scope) ? <CombinedBadge /> : <LocationDot id={ids[0]} />}
-          <p className="font-display mt-2 text-3xl font-semibold tabular">{moneyExact(spend)}</p>
-          <p className="text-sm text-muted">Location-assigned spend in this list (brand drafts = $0)</p>
-        </Card>
-        {scoped.map((c) => (
-          <Card key={c.id}>
-            <div className="flex items-center justify-between gap-2">
-              {c.locationId ? (
-                <LocationDot id={c.locationId} />
-              ) : (
-                <span className="text-xs font-bold uppercase tracking-wide text-muted">Brand — no location spend</span>
-              )}
-              <span className="text-[11px] font-bold uppercase text-muted">{c.status}</span>
-            </div>
-            <p className="mt-1 font-semibold">{c.name}</p>
-            <p className="text-sm text-muted">
-              {platformLabel(c.channel)} · {formatShortDate(c.startDate)}
-              {c.endDate ? ` – ${formatShortDate(c.endDate)}` : ""}
-            </p>
-            <p className="mt-2 tabular text-sm">
-              Spend {moneyExact(c.spend)}
-              {c.impressions != null ? ` · ${number(c.impressions)} impr` : ""}
-              {c.clicks != null ? ` · ${number(c.clicks)} taps` : ""}
-            </p>
-            {c.notes ? <p className="mt-2 text-sm leading-5 text-muted">{c.notes}</p> : null}
-          </Card>
-        ))}
+      <TopBar
+        title="Marketing"
+        subtitle="Ad spend stays on the location that bought it"
+        scope={scope}
+      />
+      <main className="px-4 py-4">
+        <MarketingHub
+          scope={scope}
+          ids={ids}
+          today={today}
+          periodLabel="5 days"
+          bundles={bundles}
+          secretRefs={integrations.map((i) => ({
+            locationId: i.locationId,
+            provider: i.provider,
+            secretRef: i.secretRef,
+            storeRef: i.storeRef,
+            status: i.status,
+          }))}
+          otherCampaigns={otherCampaigns}
+          otherSpend={otherSpend}
+        />
       </main>
     </>
   );

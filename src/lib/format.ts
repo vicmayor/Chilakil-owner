@@ -49,6 +49,18 @@ export function platformLabel(platform: string): string {
       return "Grubhub";
     case "google":
       return "Google";
+    case "google_ads":
+      return "Google Ads";
+    case "google_business":
+      return "Google Business";
+    case "search":
+      return "Search";
+    case "maps":
+      return "Maps";
+    case "youtube":
+      return "YouTube";
+    case "tiktok":
+      return "TikTok";
     case "yelp":
       return "Yelp";
     case "instagram":
@@ -69,6 +81,42 @@ export function platformLabel(platform: string): string {
       return "Banking";
     default:
       return platform;
+  }
+}
+
+export function campaignStatusLabel(status: string): string {
+  switch (status) {
+    case "active":
+      return "Active";
+    case "paused":
+      return "Paused";
+    case "ended":
+      return "Ended";
+    case "draft":
+      return "Draft";
+    case "scheduled":
+      return "Scheduled";
+    default:
+      return status;
+  }
+}
+
+export function resultTypeLabel(resultType: string | null | undefined): string {
+  switch (resultType) {
+    case "purchases":
+      return "Purchases";
+    case "leads":
+      return "Leads";
+    case "messages":
+      return "Messages";
+    case "link_clicks":
+      return "Link clicks";
+    case "reach":
+      return "Reach";
+    case "video_views":
+      return "Video views";
+    default:
+      return resultType ? resultType.replace(/_/g, " ") : "Results";
   }
 }
 

@@ -32,6 +32,9 @@ export const LOCATIONS: Record<
 export const COMBINED_LABEL = "Combined total (Glendale + Avondale)";
 export const COMBINED_BANNER =
   "Both locations — each figure is labeled. Combined totals are marked so they are never mistaken for a single store.";
+export const BUSINESS_WIDE_LABEL = "Business-wide";
+export const BUSINESS_WIDE_BANNER =
+  "Business-wide — not Glendale or Avondale. Never attributed to a single store.";
 
 export function isLocationId(value: string): value is LocationId {
   return value === "glendale" || value === "avondale";
