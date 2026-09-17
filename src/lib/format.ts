@@ -72,6 +72,40 @@ export function platformLabel(platform: string): string {
   }
 }
 
+export function campaignStatusLabel(status: string): string {
+  switch (status) {
+    case "active":
+      return "Active";
+    case "paused":
+      return "Paused";
+    case "ended":
+      return "Ended";
+    case "draft":
+      return "Draft";
+    case "scheduled":
+      return "Scheduled";
+    default:
+      return status;
+  }
+}
+
+export function resultTypeLabel(resultType: string | null | undefined): string {
+  switch (resultType) {
+    case "purchases":
+      return "Purchases";
+    case "leads":
+      return "Leads";
+    case "messages":
+      return "Messages";
+    case "link_clicks":
+      return "Link clicks";
+    case "reach":
+      return "Reach";
+    default:
+      return resultType ? resultType.replace(/_/g, " ") : "Results";
+  }
+}
+
 export function expenseCategoryLabel(category: string): string {
   const map: Record<string, string> = {
     meat: "Meat",

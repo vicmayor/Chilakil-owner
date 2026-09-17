@@ -71,7 +71,7 @@ Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid
 8. Menu & Recipes
 9. Customer Messages — EN/ES chrome; sensitive types require owner Approve / Edit / Reject
 10. Reviews
-11. Marketing
+11. Marketing — Meta Ads sample spend/reach/clicks/results by location (live Graph API is Phase 2)
 12. Employees
 13. AI Assistant — queries seeded data; respects the location filter
 
@@ -96,8 +96,10 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `DailyOps` — labor hours/cost, theoretical food cost, actual purchases, targets
 - `Expense`, `Ingredient`, `Recipe`, `RecipeIngredient`, `MenuItem`
 - `CustomerMessage` — `language` `en|es`, sensitivity flags, draft/approved reply
-- `Review`, `MarketingCampaign`, `Employee`, `Shift`
-- `IntegrationConfig` — `secretRef` env var name only
+- `Review`, `MarketingCampaign` (`platform`, `reach`, `results`, `resultType`; `locationId` null = business-wide)
+- `MetaAdDailyStats` — per-campaign daily Meta spend/reach/impressions/clicks/results (seeded; no live API)
+- `Employee`, `Shift`
+- `IntegrationConfig` — `secretRef` env var name only. Meta uses `META_GLENDALE_ACCESS_TOKEN`, `META_AVONDALE_ACCESS_TOKEN`, and `META_AD_ACCOUNT_ID`
 - `Alert`, `AiThread`, `AiMessage`, `User`
 
 Seed covers **today (America/Phoenix)** plus four prior days for both locations, with deliberately different volume so switching ALL / GLENDALE / AVONDALE is obvious.
@@ -113,9 +115,29 @@ Today’s seeded shape (Phoenix “today”, not a fixed calendar date):
 | Theoretical food | $1,694.33 | $773.99 |
 | Orders | 127 | 61 |
 
+Today’s seeded Meta Ads (sample, not live):
+
+| | Glendale | Avondale | Business-wide (ALL only) |
+| --- | --- | --- | --- |
+| Spend today | $79.70 | $30.15 | $35.00 |
+
 ## Env vars
 
 See `.env.example`. Required for local run: `DATABASE_URL`, `AUTH_SECRET` (or `NEXTAUTH_SECRET`). Optional: `OPENAI_API_KEY`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
+
+### Meta Ads (Phase 1 placeholders)
+
+Marketing shows **seeded** Meta (Facebook/Instagram) campaigns so ALL / GLENDALE / AVONDALE changes the numbers. There are **no live Graph API calls**.
+
+| Env var | Used as |
+| --- | --- |
+| `META_GLENDALE_ACCESS_TOKEN` | IntegrationConfig `secretRef` for Glendale |
+| `META_AVONDALE_ACCESS_TOKEN` | IntegrationConfig `secretRef` for Avondale |
+| `META_AD_ACCOUNT_ID` | IntegrationConfig `storeRef` (shared ad account) |
+
+Leave them blank until Phase 2. Never put token values in the database.
+
+Business-wide campaigns (`locationId` null) appear **only on ALL**, labeled **Business-wide**. They are never attributed to Glendale or Avondale.
 
 ## Tests
 

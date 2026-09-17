@@ -205,19 +205,42 @@ model Review {
   responseText String?
 }
 
+/// Paid or organic campaign. `locationId` null = business-wide (ALL only).
+/// Meta rows use platform="meta". Daily Graph-style stats live on MetaAdDailyStats.
 model MarketingCampaign {
-  id         String    @id @default(cuid())
-  locationId String?
-  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  name       String
-  channel    String
-  status     String
-  startDate  String
-  endDate    String?
-  spend      Float
+  id          String    @id @default(cuid())
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  name        String
+  channel     String // facebook | instagram | google | sms | meta | ...
+  platform    String    @default("other") // meta | google | sms | other
+  status      String // active | paused | ended | draft | scheduled
+  startDate   String
+  endDate     String?
+  spend       Float
+  reach       Int?
   impressions Int?
-  clicks     Int?
-  notes      String?
+  clicks      Int?
+  results     Int?
+  resultType  String? // purchases | leads | messages | link_clicks | reach
+  notes       String?
+  dailyStats  MetaAdDailyStats[]
+}
+
+/// Seeded (Phase 1) daily Meta Ads metrics. Live Graph API is Phase 2.
+model MetaAdDailyStats {
+  id          String            @id @default(cuid())
+  campaignId  String
+  campaign    MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  date        String // YYYY-MM-DD in America/Phoenix
+  spend       Float
+  reach       Int
+  impressions Int
+  clicks      Int
+  results     Int
+
+  @@unique([campaignId, date])
+  @@index([date])
 }
 
 model Employee {

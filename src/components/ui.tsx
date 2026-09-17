@@ -54,6 +54,14 @@ export function CombinedBadge() {
   );
 }
 
+export function BusinessWideBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-brand-yellow px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-brand">
+      Business-wide
+    </span>
+  );
+}
+
 export function LocationDot({ id }: { id: string }) {
   const color = id === "avondale" ? "bg-avondale" : "bg-glendale";
   const label = id === "avondale" ? "Avondale" : "Glendale";

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/location.test.ts src/lib/metrics.test.ts",
+    "test": "tsx --test src/lib/location.test.ts src/lib/metrics.test.ts src/lib/marketing.test.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

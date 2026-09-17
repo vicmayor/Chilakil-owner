@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  BUSINESS_WIDE_LABEL,
   COMBINED_LABEL,
   isCombinedScope,
   locationIdsForScope,
@@ -27,4 +28,9 @@ test("unknown cookie values default to ALL rather than a silent merge of one id"
 test("combined totals keep an explicit label", () => {
   assert.match(COMBINED_LABEL, /Glendale/i);
   assert.match(COMBINED_LABEL, /Avondale/i);
+});
+
+test("business-wide is a distinct label, not a store name", () => {
+  assert.equal(BUSINESS_WIDE_LABEL, "Business-wide");
+  assert.notEqual(BUSINESS_WIDE_LABEL, COMBINED_LABEL);
 });
