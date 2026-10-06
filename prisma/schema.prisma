@@ -46,6 +46,7 @@ model Location {
   shifts             Shift[]
   integrations       IntegrationConfig[]
   alerts             Alert[]
+  pricingReports     DoorDashPricingReport[]
 }
 
 model Order {
@@ -288,4 +289,67 @@ model AiMessage {
   role      String // user | assistant
   content   String
   createdAt DateTime @default(now())
+}
+
+/// One DoorDash vs in-store pricing report for a single location and date.
+/// Keyed so later report dates can be added without mixing stores.
+model DoorDashPricingReport {
+  id              String   @id @default(cuid())
+  locationId      String
+  location        Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  reportDate      String // YYYY-MM-DD
+  doorDashStoreId String
+  title           String
+  headline        String
+  summary         String
+  commissionRate  Float
+  commissionNote  String
+  exclusionNote   String
+  methodNote      String
+  addonNote       String?
+  addonNoteTone   String? // review | info
+  popularityLead  String
+  tenOrderExample String
+  pdfPath         String?
+  lines           DoorDashPricingLine[]
+  notes           DoorDashPricingNote[]
+
+  @@unique([locationId, reportDate, doorDashStoreId])
+  @@index([locationId, reportDate])
+}
+
+/// Menu item or add-on row from a pricing report. Read-only; nothing here changes DoorDash.
+model DoorDashPricingLine {
+  id                String                 @id @default(cuid())
+  reportId          String
+  report            DoorDashPricingReport  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  kind              String // item | addon
+  sortOrder         Int
+  name              String
+  inStorePrice      Float
+  doorDashPrice     Float?
+  onDoorDash        Boolean                @default(true)
+  markupPct         Float?
+  keepNow           Float?
+  vsInStore         Float?
+  breakEvenPrice    Float?
+  recommendedPrice  Float?
+  changeNeeded      Float?
+  keepRecommended   Float?
+  status            String // losing | ok | review | not_on_menu
+  footnote          String?
+  squareSold30d     Int?
+
+  @@index([reportId, kind, sortOrder])
+}
+
+model DoorDashPricingNote {
+  id        String                @id @default(cuid())
+  reportId  String
+  report    DoorDashPricingReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sortOrder Int
+  kind      String // check | commission | exclusion | info
+  body      String
+
+  @@index([reportId, sortOrder])
 }
