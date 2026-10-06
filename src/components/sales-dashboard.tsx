@@ -105,7 +105,7 @@ function FeaturedDay({ view, scope }: { view: SalesView; scope: LocationScope })
             <CombinedBadge />
             {view.sampleOnFeatured ? <SampleBadge /> : null}
           </div>
-          <p className="font-display mt-2 text-4xl font-semibold tabular">{moneyExact(combinedGross)}</p>
+          <p className="font-display mt-2 text-4xl font-extrabold tabular">{moneyExact(combinedGross)}</p>
           <p className="text-sm text-muted">Combined total (Glendale + Avondale)</p>
         </Card>
       ) : null}
@@ -131,7 +131,7 @@ function DayDetail({ day }: { day: LocationDay }) {
   ] as const;
   return (
     <>
-      <p className="font-display mt-2 text-4xl font-semibold tabular">{moneyExact(day.grossSales)}</p>
+      <p className="font-display mt-2 text-4xl font-extrabold tabular">{moneyExact(day.grossSales)}</p>
       <p className="text-base text-muted">
         Net {moneyExact(day.netSales)} · {number(day.orderCount)} orders · avg {moneyExact(day.averageTicket)}
       </p>
@@ -200,7 +200,7 @@ function SevenDayChart({ view, ids }: { view: SalesView; ids: LocationId[] }) {
           {day.grossByLocation.map((gross, index) => (
             <div
               key={`${day.date}-${ids[index]}`}
-              className={`w-full max-w-3 rounded-t-md ${ids[index] === "avondale" ? "bg-avondale" : "bg-glendale"}`}
+              className={`w-full max-w-3 rounded-t-md ${ids[index] === "avondale" ? "bg-avondale ring-1 ring-inset ring-ink/30" : "bg-glendale"}`}
               style={{ height: `${Math.max(4, ((gross ?? 0) / max) * 100)}%` }}
             />
           ))}
@@ -225,7 +225,7 @@ function WeekCompare({ view, scope }: { view: SalesView; scope: LocationScope })
           return (
             <li key={current.locationId} className="rounded-xl bg-paper-2 px-3 py-3">
               <LocationDot id={current.locationId} />
-              <p className="font-display mt-1 text-3xl font-semibold tabular">{moneyExact(current.gross)}</p>
+              <p className="font-display mt-1 text-3xl font-extrabold tabular">{moneyExact(current.gross)}</p>
               <p className="text-sm text-muted">
                 Week to date · {number(current.orders)} orders · {current.days} imported{" "}
                 {current.days === 1 ? "day" : "days"}
@@ -240,7 +240,7 @@ function WeekCompare({ view, scope }: { view: SalesView; scope: LocationScope })
         {isCombinedScope(scope) && view.weekToDate.combined && view.lastWeek.combined ? (
           <li className="rounded-xl border border-line px-3 py-3">
             <CombinedBadge />
-            <p className="font-display mt-1 text-3xl font-semibold tabular">
+            <p className="font-display mt-1 text-3xl font-extrabold tabular">
               {moneyExact(view.weekToDate.combined.gross)}
             </p>
             <p className="text-sm text-muted">{view.weekToDate.combined.label}</p>

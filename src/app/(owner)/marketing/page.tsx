@@ -32,7 +32,7 @@ export default async function MarketingPage() {
       <main className="space-y-4 px-4 py-4">
         <Card>
           {isCombinedScope(scope) ? <CombinedBadge /> : <LocationDot id={ids[0]} />}
-          <p className="font-display mt-2 text-3xl font-semibold tabular">{moneyExact(spend)}</p>
+          <p className="font-display mt-2 text-3xl font-extrabold tabular">{moneyExact(spend)}</p>
           <p className="text-sm text-muted">Location-assigned spend in this list (brand drafts = $0)</p>
         </Card>
         {scoped.map((c) => (

@@ -24,8 +24,8 @@ const STATUS_LABEL: Record<LineStatus, string> = {
 const STATUS_CLASS: Record<LineStatus, string> = {
   losing: "bg-red-600 text-white",
   ok: "bg-green-600 text-white",
-  review: "bg-[#FCC444] text-black",
-  not_on_menu: "bg-white text-black ring-1 ring-black/20",
+  review: "bg-chile text-ink",
+  not_on_menu: "bg-card text-ink ring-1 ring-ink/20",
 };
 
 const NOTE_LABEL: Record<string, string> = {
@@ -92,14 +92,14 @@ function Stat({
   const valueColor =
     tone === "bad" ? "text-red-600" : tone === "good" ? "text-green-700" : "text-ink";
   return (
-    <div className={`min-w-0 rounded-xl px-2.5 py-2 ${emphasis ? "bg-[#FCC444] text-black" : "bg-paper"}`}>
-      <p className={`text-[11px] font-semibold leading-4 ${emphasis ? "text-black/70" : "text-muted"}`}>
+    <div className={`min-w-0 rounded-xl px-2.5 py-2 ${emphasis ? "bg-chile text-ink" : "bg-paper-2"}`}>
+      <p className={`text-[11px] font-semibold leading-4 ${emphasis ? "text-ink/70" : "text-muted"}`}>
         {label}
       </p>
       <p
         className={`tabular mt-0.5 font-semibold leading-6 ${
           value.length > 10 ? "text-sm" : "text-lg"
-        } ${emphasis ? "text-black" : valueColor}`}
+        } ${emphasis ? "text-ink" : valueColor}`}
       >
         {value}
       </p>
@@ -128,7 +128,7 @@ export async function DoorDashPricingView({ tabs }: { tabs?: ReactNode }) {
       />
       {tabs}
       <main className="space-y-4 overflow-x-hidden px-4 py-4">
-        <div className="rounded-2xl bg-[#FCC444] px-4 py-3 text-black">
+        <div className="rounded-2xl bg-chile px-4 py-3 text-ink">
           <p className="text-base font-bold leading-5">
             Recommendations only. No DoorDash prices have been changed.
           </p>
@@ -219,14 +219,14 @@ function PricingReportSection({
 
   return (
     <section className="space-y-3" aria-labelledby={`pricing-${report.id}`}>
-      <div className="rounded-2xl border border-[#FCC444] bg-black px-4 py-3 text-white">
-        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#FCC444]">
+      <div className="rounded-2xl border border-line bg-card px-4 py-3 text-ink">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
           {place.shortName} · {place.typeLabel}
         </p>
-        <h2 id={`pricing-${report.id}`} className="mt-1 text-xl font-semibold leading-6">
+        <h2 id={`pricing-${report.id}`} className="font-display mt-1 text-xl font-extrabold leading-6">
           {place.name}
         </h2>
-        <p className="mt-1 text-sm leading-5 text-white/80">
+        <p className="mt-1 text-sm leading-5 text-muted">
           DoorDash store {report.doorDashStoreId} · {formatReportDate(report.reportDate)}
         </p>
       </div>
@@ -239,7 +239,7 @@ function PricingReportSection({
         <ul className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
           <li className="rounded-full bg-red-600 px-2.5 py-1 text-white">{losing} losing</li>
           <li className="rounded-full bg-green-600 px-2.5 py-1 text-white">{ok} OK</li>
-          <li className="rounded-full bg-[#FCC444] px-2.5 py-1 text-black">{review} needs review</li>
+          <li className="rounded-full bg-chile px-2.5 py-1 text-ink">{review} needs review</li>
         </ul>
       </Card>
 
@@ -266,7 +266,7 @@ function PricingReportSection({
           <p
             className={`rounded-2xl px-4 py-3 text-sm leading-5 ${
               report.addonNoteTone === "review"
-                ? "bg-[#FCC444] font-medium text-black"
+                ? "bg-chile font-medium text-ink"
                 : "bg-paper-2 text-ink"
             }`}
           >
@@ -297,11 +297,11 @@ function PricingReportSection({
               <span
                 className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
                   note.kind === "commission"
-                    ? "bg-[#FCC444] text-black"
+                    ? "bg-chile text-ink"
                     : note.kind === "check"
-                      ? "bg-[#FCC444] text-black"
+                      ? "bg-chile text-ink"
                       : note.kind === "exclusion"
-                        ? "bg-black text-white"
+                        ? "bg-ink text-white"
                         : "bg-paper-2 text-muted"
                 }`}
               >
@@ -317,7 +317,7 @@ function PricingReportSection({
         <a
           href={report.pdfPath}
           download
-          className="flex min-h-11 items-center justify-center rounded-2xl bg-black px-4 text-sm font-bold text-[#FCC444]"
+          className="flex min-h-11 items-center justify-center rounded-full bg-chile px-4 text-sm font-bold text-ink"
         >
           Download {place.shortName} PDF
         </a>
@@ -361,7 +361,7 @@ function PricingLineCard({ line }: { line: PricingReport["lines"][number] }) {
         <Stat label="Recommended DD price" value={price(line.recommendedPrice)} emphasis />
       </div>
       {line.footnote ? (
-        <p className="mt-3 rounded-xl bg-[#FCC444] px-3 py-2 text-sm leading-5 font-medium text-black">
+        <p className="mt-3 rounded-xl bg-chile px-3 py-2 text-sm leading-5 font-medium text-ink">
           {line.footnote}
         </p>
       ) : null}

@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-line bg-card p-4 shadow-[0_1px_0_rgba(26,20,16,0.04)] ${className}`}
+      className={`rounded-2xl border border-line bg-card p-4 shadow-[0_1px_0_rgba(0,0,0,0.06)] ${className}`}
     >
       {children}
     </section>
@@ -38,7 +38,7 @@ export function Metric({
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</p>
-      <p className={`font-display tabular mt-1 text-[1.65rem] font-semibold leading-none ${valueColor}`}>
+      <p className={`font-display tabular mt-1 text-[1.65rem] font-extrabold leading-none ${valueColor}`}>
         {value}
       </p>
       {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
@@ -63,12 +63,14 @@ export function CombinedBadge() {
 }
 
 export function LocationDot({ id }: { id: string }) {
-  const color = id === "avondale" ? "bg-avondale" : "bg-glendale";
-  const label = id === "avondale" ? "Avondale" : "Glendale";
+  const avondale = id === "avondale";
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
-      <span className={`h-1.5 w-1.5 rounded-full ${color}`} />
-      {label}
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+        avondale ? "bg-avondale text-ink ring-1 ring-ink" : "bg-glendale text-white"
+      }`}
+    >
+      {avondale ? "Avondale" : "Glendale"}
     </span>
   );
 }

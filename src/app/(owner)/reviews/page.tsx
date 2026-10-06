@@ -37,7 +37,7 @@ export default async function ReviewsPage() {
               {r.responded ? " · replied" : " · needs a reply"}
             </p>
             {r.responseText ? (
-              <p className="mt-2 rounded-xl bg-paper px-3 py-2 text-sm text-muted">{r.responseText}</p>
+              <p className="mt-2 rounded-xl bg-paper-2 px-3 py-2 text-sm text-muted">{r.responseText}</p>
             ) : null}
           </Card>
         ))}

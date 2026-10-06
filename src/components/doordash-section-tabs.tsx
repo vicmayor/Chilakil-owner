@@ -11,7 +11,7 @@ export function DoorDashSectionTabs({ active }: { active: "overview" | "pricing"
       <div
         role="tablist"
         aria-label="DoorDash sections"
-        className="grid grid-cols-2 gap-1 rounded-2xl bg-paper-2 p-1"
+        className="grid grid-cols-2 gap-1 rounded-full bg-paper-2 p-1"
       >
         {tabs.map((tab) => {
           const selected = tab.id === active;
@@ -21,8 +21,8 @@ export function DoorDashSectionTabs({ active }: { active: "overview" | "pricing"
               href={tab.href}
               role="tab"
               aria-selected={selected}
-              className={`flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-bold ${
-                selected ? "bg-[#FCC444] text-black" : "text-muted"
+              className={`flex min-h-11 items-center justify-center rounded-full px-3 text-sm font-bold ${
+                selected ? "bg-chile text-ink" : "text-muted"
               }`}
             >
               {tab.label}
