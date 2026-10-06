@@ -10,10 +10,14 @@ import {
 } from "@/lib/location";
 import { getDashboardData } from "@/lib/metrics";
 
+function moneyMaybe(amount: number | null): string {
+  return amount == null ? "not imported" : moneyExact(amount);
+}
+
 export type BusinessSnapshot = {
   generatedAt: string;
   timezone: "America/Phoenix";
-  source: "local SQLite seed — no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank APIs";
+  source: "local database — no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank APIs";
   scope: LocationScope;
   notice: string;
   today: Awaited<ReturnType<typeof getDashboardData>>;
@@ -117,7 +121,7 @@ export async function buildSnapshot(scope: LocationScope): Promise<BusinessSnaps
   return {
     generatedAt: new Date().toISOString(),
     timezone: "America/Phoenix",
-    source: "local SQLite seed — no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank APIs",
+    source: "local database — no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank APIs",
     scope,
     notice,
     today,
@@ -271,7 +275,7 @@ export function deterministicAnswer(question: string, snapshot: BusinessSnapshot
     const rows = snapshot.channels.filter((c) => (want ? c.channel === want : c.channel !== "in_store"));
     if (snapshot.today.combined) {
       lines.push(
-        `${COMBINED_LABEL} delivery gross: ${moneyExact(snapshot.today.combined.deliveryGross)} of ${moneyExact(snapshot.today.combined.gross)} gross.`,
+        `${COMBINED_LABEL} delivery gross: ${moneyMaybe(snapshot.today.combined.deliveryGross)} of ${moneyExact(snapshot.today.combined.gross)} gross.`,
       );
     }
     for (const row of rows) {
@@ -287,14 +291,14 @@ export function deterministicAnswer(question: string, snapshot: BusinessSnapshot
     const c = snapshot.today.combined;
     lines.push(`${COMBINED_LABEL}`);
     lines.push(
-      `Gross ${moneyExact(c.gross)} · delivery ${moneyExact(c.deliveryGross)} · net after fees ${moneyExact(c.net)} · labor ${moneyExact(c.labor)} · food ${moneyExact(c.foodCost)} · ${c.orderCount} orders · avg ticket ${moneyExact(c.averageTicket)}.`,
+      `Gross ${moneyExact(c.gross)} · delivery ${moneyMaybe(c.deliveryGross)} · net after fees ${moneyExact(c.net)} · labor ${moneyExact(c.labor)} · food ${moneyExact(c.foodCost)} · ${c.orderCount} orders · avg ticket ${moneyExact(c.averageTicket)}.`,
     );
     lines.push("");
   }
   for (const loc of snapshot.today.locations) {
     lines.push(`${loc.name}`);
     lines.push(
-      `Gross ${moneyExact(loc.gross)} · in-store ${moneyExact(loc.inStoreGross)} · delivery ${moneyExact(loc.deliveryGross)} · fees ${moneyExact(loc.fees)} · net ${moneyExact(loc.net)}.`,
+      `Gross ${moneyExact(loc.gross)} · in-store ${moneyExact(loc.inStoreGross)} · delivery ${moneyMaybe(loc.deliveryGross)} · fees ${moneyExact(loc.fees)} · net ${moneyExact(loc.net)}.`,
     );
     lines.push(
       `Labor ${moneyExact(loc.labor)} (${pct(loc.laborPct)}) · estimated food cost ${moneyExact(loc.foodCost)} (${pct(loc.foodCostPct)}) · ${loc.orderCount} orders · avg ticket ${moneyExact(loc.averageTicket)}.`,

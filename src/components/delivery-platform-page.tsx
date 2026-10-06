@@ -4,7 +4,8 @@ import { locationIdsForScope, isCombinedScope, COMBINED_LABEL } from "@/lib/loca
 import { phoenixToday, formatShortDate, shiftIsoDate } from "@/lib/dates";
 import { moneyExact, number, pct, platformLabel } from "@/lib/format";
 import { TopBar } from "@/components/top-bar";
-import { Card, CombinedBadge, LocationDot } from "@/components/ui";
+import { DoorDashWeeklySection } from "@/components/doordash-weekly-section";
+import { Card, CombinedBadge, LocationDot, SampleBadge } from "@/components/ui";
 
 export async function DeliveryPlatformPage({
   platform,
@@ -37,6 +38,13 @@ export async function DeliveryPlatformPage({
         scope={scope}
       />
       <main className="space-y-4 px-4 py-4">
+        {platform === "doordash" ? <DoorDashWeeklySection /> : null}
+        {summaries.length > 0 ? (
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Daily summaries</h2>
+            <SampleBadge />
+          </div>
+        ) : null}
         {isCombinedScope(scope) && todayRows.length > 1 ? (
           <Card>
             <CombinedBadge />

@@ -9,36 +9,47 @@ Mobile-first owner app for **Chilakil To Go**. Two operations are tracked as sep
 
 The location switcher (**ALL / GLENDALE / AVONDALE**) sits on every financial screen. **ALL** shows each location labeled, plus optional totals marked **Combined total (Glendale + Avondale)**. A single location shows only that store.
 
-This is **Phase 1**: UI, SQLite schema, seed data, auth shell, and an assistant that reads the local database. There are **no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank API calls**. Integration rows store env var *names* (`secretRef`), never secret values.
+Phase 1 UI, auth, and the assistant are still here. Sales days and DoorDash weeks can now be imported into Postgres. There are still **no live DoorDash, Uber Eats, Grubhub, Square, Meta, or bank API calls** — reports are posted to the ingest API. Integration rows store env var *names* (`secretRef`), never secret values.
 
 ## Run locally
 
+Postgres is required. Pick one:
+
+**Docker**
+
+```bash
+docker compose up -d
+```
+
+**Neon dev database**
+
+Create a Neon branch and copy its pooled URL into `DATABASE_URL` and its direct URL into `DIRECT_URL`.
+
+Then:
+
 ```bash
 cp .env.example .env
-# set AUTH_SECRET / NEXTAUTH_SECRET to a long random string:
-#   openssl rand -base64 32
+# Fill in AUTH_SECRET, INGEST_TOKEN, and OWNER_PASSWORD.
+# Generate secrets with: openssl rand -base64 32
+# For the local demo dataset, set SEED_SAMPLE=true
 
 npm install
-npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 npx prisma db seed
 npm run dev
 ```
 
-Or `npm run setup && npm run dev`.
+Or `npm run setup && npm run dev` after `.env` is filled in.
 
-Open [http://localhost:3000](http://localhost:3000). On iPhone Safari: Share → Add to Home Screen (PWA manifest is included).
+Open [http://localhost:3000](http://localhost:3000). On iPhone Safari: Share → Add to Home Screen. The PWA manifest and PNG icons are included.
 
-### Seed login
+### Owner login
 
-| | |
-| --- | --- |
-| Email | `owner@chilakil.com` |
-| Password | `ChilakilOwner1!` (override with `OWNER_PASSWORD`) |
+`npx prisma db seed` creates the owner from `OWNER_EMAIL` and `OWNER_PASSWORD`. Both are required. The app does not ship a demo password. Re-running the seed updates that owner's password to the current `OWNER_PASSWORD`.
 
-Change that password before any shared or production use. It exists only so the local demo can sign in.
+Set `SEED_SAMPLE=true` only when you want the local demo financials. Those rows are marked `source = sample` and show a SAMPLE badge. Production should leave `SEED_SAMPLE` unset.
 
-### One-liner reset
+### Reset the local database
 
 ```bash
 npm run db:reset
@@ -47,17 +58,63 @@ npm run db:reset
 ## Stack
 
 - Next.js App Router + TypeScript + Tailwind CSS v4
-- SQLite via Prisma (see `prisma/schema.prisma`)
-- Signed HTTP-only JWT session (`jose` + `bcryptjs`). `NEXTAUTH_SECRET` is accepted as an alias for `AUTH_SECRET` so the env list matches common Auth.js setups
-- Optional OpenAI for the assistant (`OPENAI_API_KEY`). If unset, answers are deterministic from SQLite
-
-### Path to Postgres
-
-1. Change `provider = "sqlite"` to `provider = "postgresql"` in `prisma/schema.prisma`
-2. Point `DATABASE_URL` at Postgres
-3. `npx prisma migrate dev`
+- PostgreSQL via Prisma (`DATABASE_URL` at runtime, `DIRECT_URL` for migrations)
+- Signed HTTP-only JWT session (`jose` + `bcryptjs`). `NEXTAUTH_SECRET` is accepted as an alias for `AUTH_SECRET`
+- Optional OpenAI for the assistant (`OPENAI_API_KEY`). If unset, answers are deterministic from the database
 
 Keep location-scoped rows (`locationId` on sales, expenses, labor, messages, etc.). Do not add unscoped “company total” tables that skip the switcher.
+
+## Deploy to Vercel + Neon
+
+Do this from the Vercel dashboard. Nothing in this repo deploys itself.
+
+1. Import the GitHub repo as a Vercel project (Next.js). The build command is `npm run build`, which runs `prisma generate`, `prisma migrate deploy`, and `next build`.
+2. In the Vercel project, open **Storage** (or Integrations) and add **Neon** from the Marketplace. Create the database and connect it to this project.
+3. Copy the Neon URLs into Vercel environment variables for Production (and Preview, if you want preview databases):
+   - `DATABASE_URL` = the **pooled** Neon URL
+   - `DIRECT_URL` = the **unpooled / direct** Neon URL (`DATABASE_URL_UNPOOLED` or `POSTGRES_URL_NON_POOLING` in the Neon integration)
+4. Set the rest of the required variables (same values are not stored in git):
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | Pooled Postgres URL |
+| `DIRECT_URL` | Yes | Direct Postgres URL for migrations |
+| `AUTH_SECRET` | Yes | `openssl rand -base64 32` |
+| `INGEST_TOKEN` | Yes | Bearer token for `/api/ingest/*`. Same generator |
+| `OWNER_EMAIL` | Yes | Used by the one-time seed, not by the Vercel build |
+| `OWNER_PASSWORD` | Yes | At least 10 characters. Used by the one-time seed |
+| `OWNER_NAME` | No | Defaults to Victor Mayorga |
+| `APP_URL` | No | Public URL, for example `https://your-app.vercel.app` |
+| `OPENAI_API_KEY` | No | Assistant only. Leave unset to use local analysis |
+| `NEXTAUTH_SECRET` | No | Optional alias of `AUTH_SECRET` |
+| `SEED_SAMPLE` | No | Leave **unset** in production |
+
+5. Deploy. The first deploy applies `prisma/migrations`.
+6. Create the owner once, from your machine, pointed at the production database. Do not put the password in the Vercel build command.
+
+```bash
+DATABASE_URL="postgresql://…" \
+DIRECT_URL="postgresql://…" \
+OWNER_EMAIL="owner@chilakil.com" \
+OWNER_PASSWORD="…" \
+OWNER_NAME="Victor Mayorga" \
+npx prisma db seed
+```
+
+Leave `SEED_SAMPLE` unset for that command. It upserts the two locations and the owner, and does not load demo sales.
+
+7. Add to the iPhone Home Screen from Safari. Confirm the icon is the Chilakil mark.
+
+## Import daily sales and DoorDash weeks
+
+`POST /api/ingest/daily-sales` and `POST /api/ingest/doordash-weekly` require `Authorization: Bearer $INGEST_TOKEN`. Each accepts one JSON object, a JSON array, or `{ "records": [ ... ] }`. CSV is accepted when `Content-Type` is `text/csv`. Unknown locations are rejected. A DoorDash store id must match the location (`32669627` Glendale, `27859030` Avondale) or the whole request is rejected and nothing is written. Re-posting the same location and date (or location and week start) updates that row.
+
+```bash
+npm run ingest -- daily-sales examples/daily-sales.json
+npm run ingest -- doordash-weekly examples/doordash-weekly.csv
+```
+
+Example files live in `examples/`. `source` cannot be `sample` on these endpoints; that value is only for the local demo seed.
 
 ## Modules
 
@@ -91,7 +148,9 @@ It never invents live platform API results. The snapshot `source` field says so.
 ## Schema (core)
 
 - `Location` — stable ids `glendale` / `avondale`
-- `DailySales` + `Order` — `channel`: `in_store | doordash | ubereats | grubhub | other`
+- `DailySales` + `Order` — channel mix: `in_store | doordash | ubereats | grubhub | other`
+- `DailySalesRecord` — one imported Phoenix day per location (unique on location + date)
+- `DoorDashWeeklyReport` — one DoorDash merchant week per location (unique on location + week start)
 - `DeliverySummary` — per location + platform + date
 - `DailyOps` — labor hours/cost, theoretical food cost, actual purchases, targets
 - `Expense`, `Ingredient`, `Recipe`, `RecipeIngredient`, `MenuItem`
@@ -115,7 +174,9 @@ Today’s seeded shape (Phoenix “today”, not a fixed calendar date):
 
 ## Env vars
 
-See `.env.example`. Required for local run: `DATABASE_URL`, `AUTH_SECRET` (or `NEXTAUTH_SECRET`). Optional: `OPENAI_API_KEY`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
+See `.env.example`. Required: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `INGEST_TOKEN`, `OWNER_EMAIL`, `OWNER_PASSWORD`. Optional: `OPENAI_API_KEY`, `APP_URL`, `OWNER_NAME`, `SEED_SAMPLE`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
+
+`DailySales` is still the channel-level sample mix. Imported days live in `DailySalesRecord` (unique on location + Phoenix date). DoorDash merchant weeks live in `DoorDashWeeklyReport` (unique on location + week start). The dashboard uses `DailySalesRecord` for today when a row exists.
 
 ## Tests
 

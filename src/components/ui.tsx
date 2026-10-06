@@ -46,6 +46,14 @@ export function Metric({
   );
 }
 
+export function SampleBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn">
+      Sample
+    </span>
+  );
+}
+
 export function CombinedBadge() {
   return (
     <span className="inline-flex items-center rounded-full bg-paper-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">

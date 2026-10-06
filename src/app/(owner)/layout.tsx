@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { locationIdsForScope } from "@/lib/location";
 import { BottomNav } from "@/components/bottom-nav";
 
+export const dynamic = "force-dynamic";
+
 export default async function OwnerLayout({
   children,
 }: {

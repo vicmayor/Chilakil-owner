@@ -1,0 +1,3 @@
+location,doorDashStoreId,weekStart,weekEnd,subtotal,gross,orderCount,commission,marketingFees,errorCharges,adjustments,netPayout,effectiveCommissionPct,deliveryOrders,pickupOrders,deliverySubtotal,pickupSubtotal,source
+glendale,32669627,2026-09-21,2026-09-27,5890,5890,126,1710,210,40,0,3930,29.03,91,35,4250,1640,example
+avondale,27859030,2026-09-21,2026-09-27,4010,4010,99,1283.20,160,48,0,2518.80,32.00,80,19,3240,770,example
