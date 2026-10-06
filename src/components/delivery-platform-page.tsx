@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/db";
 import { getLocationScope } from "@/lib/scope";
 import { locationIdsForScope, isCombinedScope, COMBINED_LABEL } from "@/lib/location";
@@ -9,8 +10,10 @@ import { Card, CombinedBadge, LocationDot, SampleBadge } from "@/components/ui";
 
 export async function DeliveryPlatformPage({
   platform,
+  belowHeader,
 }: {
   platform: "doordash" | "ubereats" | "grubhub";
+  belowHeader?: ReactNode;
 }) {
   const scope = await getLocationScope();
   const ids = locationIdsForScope(scope);
@@ -37,6 +40,7 @@ export async function DeliveryPlatformPage({
         subtitle="Seeded daily summaries. Live API is Phase 2."
         scope={scope}
       />
+      {belowHeader}
       <main className="space-y-4 px-4 py-4">
         {platform === "doordash" ? <DoorDashWeeklySection /> : null}
         {summaries.length > 0 ? (

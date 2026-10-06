@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DOORDASH_PRICING_REPORTS } from "../src/data/doordash-pricing-reports";
 import { phoenixMonday, phoenixToday, shiftIsoDate } from "../src/lib/dates";
 import { DOORDASH_STORE_IDS } from "../src/lib/doordash-stores";
 import { loadEnvFile } from "../src/lib/load-env";
@@ -21,8 +22,9 @@ async function main() {
   await ensureOwner();
 
   if (process.env.SEED_SAMPLE !== "true") {
+    await seedDoorDashPricing();
     console.log("Owner and locations are ready. Sample financials were not loaded.");
-    console.log("Set SEED_SAMPLE=true to load the local demo dataset.");
+    console.log("DoorDash pricing reports were refreshed. Set SEED_SAMPLE=true to load the local demo dataset.");
     return;
   }
 
@@ -52,6 +54,9 @@ async function main() {
   await prisma.deliverySummary.deleteMany();
   await prisma.dailySales.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.doorDashPricingNote.deleteMany();
+  await prisma.doorDashPricingLine.deleteMany();
+  await prisma.doorDashPricingReport.deleteMany();
 
   type DayPlan = {
     offset: number;
@@ -493,6 +498,7 @@ async function main() {
   await seedIntegrations();
   await seedAlerts(today);
   await seedDoorDashWeeks(today);
+  await seedDoorDashPricing();
 
   console.log(`Seeded Chilakil Owner sample data for Phoenix date ${today}`);
   console.log("Daily sales and DoorDash weeks are marked source=sample.");
@@ -1290,6 +1296,60 @@ async function seedAlerts(today: string) {
       },
     ],
   });
+}
+
+async function seedDoorDashPricing() {
+  await prisma.doorDashPricingNote.deleteMany();
+  await prisma.doorDashPricingLine.deleteMany();
+  await prisma.doorDashPricingReport.deleteMany();
+  for (const report of DOORDASH_PRICING_REPORTS) {
+    await prisma.doorDashPricingReport.create({
+      data: {
+        locationId: report.locationId,
+        reportDate: report.reportDate,
+        doorDashStoreId: report.doorDashStoreId,
+        title: report.title,
+        headline: report.headline,
+        summary: report.summary,
+        commissionRate: report.commissionRate,
+        commissionNote: report.commissionNote,
+        exclusionNote: report.exclusionNote,
+        methodNote: report.methodNote,
+        addonNote: report.addonNote,
+        addonNoteTone: report.addonNoteTone,
+        popularityLead: report.popularityLead,
+        tenOrderExample: report.tenOrderExample,
+        pdfPath: report.pdfPath,
+        lines: {
+          create: report.lines.map((line, sortOrder) => ({
+            kind: line.kind,
+            sortOrder,
+            name: line.name,
+            inStorePrice: line.inStorePrice,
+            doorDashPrice: line.doorDashPrice,
+            onDoorDash: line.onDoorDash,
+            markupPct: line.markupPct,
+            keepNow: line.keepNow,
+            vsInStore: line.vsInStore,
+            breakEvenPrice: line.breakEvenPrice,
+            recommendedPrice: line.recommendedPrice,
+            changeNeeded: line.changeNeeded,
+            keepRecommended: line.keepRecommended,
+            status: line.status,
+            footnote: line.footnote,
+            squareSold30d: line.squareSold30d,
+          })),
+        },
+        notes: {
+          create: report.notes.map((note, sortOrder) => ({
+            sortOrder,
+            kind: note.kind,
+            body: note.body,
+          })),
+        },
+      },
+    });
+  }
 }
 
 main()
