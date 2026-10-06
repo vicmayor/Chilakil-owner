@@ -1,0 +1,44 @@
+{
+  "records": [
+    {
+      "location": "glendale",
+      "doorDashStoreId": "32669627",
+      "weekStart": "2026-09-28",
+      "weekEnd": "2026-10-04",
+      "subtotal": 6240,
+      "gross": 6240,
+      "orderCount": 136,
+      "commission": 1872,
+      "marketingFees": 260,
+      "errorCharges": 48,
+      "adjustments": 0,
+      "netPayout": 4060,
+      "effectiveCommissionPct": 30,
+      "deliveryOrders": 98,
+      "pickupOrders": 38,
+      "deliverySubtotal": 4500,
+      "pickupSubtotal": 1740,
+      "source": "example"
+    },
+    {
+      "location": "avondale",
+      "doorDashStoreId": "27859030",
+      "weekStart": "2026-09-28",
+      "weekEnd": "2026-10-04",
+      "subtotal": 4510,
+      "gross": 4510,
+      "orderCount": 112,
+      "commission": 1488.3,
+      "marketingFees": 205,
+      "errorCharges": 66,
+      "adjustments": 15,
+      "netPayout": 2735.7,
+      "effectiveCommissionPct": 33,
+      "deliveryOrders": 88,
+      "pickupOrders": 24,
+      "deliverySubtotal": 3540,
+      "pickupSubtotal": 970,
+      "source": "example"
+    }
+  ]
+}

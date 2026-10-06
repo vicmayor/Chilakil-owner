@@ -1,0 +1,82 @@
+{
+  "records": [
+    {
+      "location": "glendale",
+      "date": "2026-10-06",
+      "grossSales": 5120.4,
+      "netSales": 4688.15,
+      "discounts": 86,
+      "refunds": 24.5,
+      "tips": 310,
+      "tax": 412.75,
+      "orderCount": 119,
+      "averageTicket": 43.03,
+      "channels": {
+        "inStore": { "gross": 3400, "orders": 78 },
+        "doorDash": { "gross": 1100, "orders": 24 },
+        "uberEats": { "gross": 420, "orders": 11 },
+        "grubhub": { "gross": 200.4, "orders": 6 }
+      },
+      "source": "example"
+    },
+    {
+      "location": "avondale",
+      "date": "2026-10-06",
+      "grossSales": 2310.8,
+      "netSales": 1894.2,
+      "discounts": 30,
+      "refunds": 18,
+      "tips": 96,
+      "tax": 168.4,
+      "orderCount": 58,
+      "averageTicket": 39.84,
+      "channels": {
+        "inStore": { "gross": 640, "orders": 16 },
+        "doorDash": { "gross": 1120, "orders": 27 },
+        "uberEats": { "gross": 390.8, "orders": 10 },
+        "grubhub": { "gross": 160, "orders": 5 }
+      },
+      "source": "example"
+    },
+    {
+      "location": "glendale",
+      "date": "2026-10-05",
+      "grossSales": 4760,
+      "netSales": 4390.1,
+      "discounts": 40,
+      "refunds": 12,
+      "tips": 250,
+      "tax": 380,
+      "orderCount": 108,
+      "source": "example",
+      "inStoreGross": 3100,
+      "inStoreOrders": 72,
+      "doorDashGross": 980,
+      "doorDashOrders": 21,
+      "uberEatsGross": 480,
+      "uberEatsOrders": 10,
+      "grubhubGross": 200,
+      "grubhubOrders": 5
+    },
+    {
+      "location": "avondale",
+      "date": "2026-10-05",
+      "grossSales": 1988.5,
+      "netSales": 1610.25,
+      "discounts": 22,
+      "refunds": 9.5,
+      "tips": 70,
+      "tax": 140,
+      "orderCount": 49,
+      "source": "example",
+      "inStoreGross": 510,
+      "inStoreOrders": 13,
+      "doorDashGross": 990,
+      "doorDashOrders": 24,
+      "uberEatsGross": 328.5,
+      "uberEatsOrders": 8,
+      "grubhubGross": 160,
+      "grubhubOrders": 4
+    }
+  ]
+}

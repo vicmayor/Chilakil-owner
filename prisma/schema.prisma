@@ -1,14 +1,15 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
-// SQLite for local/dev. To move to Postgres later:
-// 1. Change provider to "postgresql"
-// 2. Set DATABASE_URL to a Postgres connection string
-// 3. Run `npx prisma migrate dev`
+// Postgres for local docker-compose and hosted Neon.
+// DATABASE_URL is the runtime connection (use the Neon pooled URL on Vercel).
+// DIRECT_URL is the direct connection Prisma Migrate uses (Neon unpooled URL).
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -44,9 +45,11 @@ model Location {
   campaigns          MarketingCampaign[]
   employees          Employee[]
   shifts             Shift[]
-  integrations       IntegrationConfig[]
-  alerts             Alert[]
-  pricingReports     DoorDashPricingReport[]
+  integrations          IntegrationConfig[]
+  alerts                Alert[]
+  dailySalesRecords     DailySalesRecord[]
+  doorDashWeeklyReports DoorDashWeeklyReport[]
+  pricingReports        DoorDashPricingReport[]
 }
 
 model Order {
@@ -289,6 +292,66 @@ model AiMessage {
   role      String // user | assistant
   content   String
   createdAt DateTime @default(now())
+}
+
+/// One imported sales day for a single location. Phoenix calendar date.
+/// Idempotent on location + date. Channel columns are optional.
+model DailySalesRecord {
+  id            String   @id @default(cuid())
+  locationId    String
+  location      Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  date          String // YYYY-MM-DD in America/Phoenix
+  grossSales    Float
+  netSales      Float
+  discounts     Float    @default(0)
+  refunds       Float    @default(0)
+  tips          Float    @default(0)
+  tax           Float?
+  orderCount    Int
+  averageTicket Float
+  inStoreGross  Float?
+  inStoreOrders Int?
+  doorDashGross Float?
+  doorDashOrders Int?
+  uberEatsGross Float?
+  uberEatsOrders Int?
+  grubhubGross  Float?
+  grubhubOrders Int?
+  source        String
+  importedAt    DateTime @default(now())
+
+  @@unique([locationId, date])
+  @@index([locationId, date])
+}
+
+/// One DoorDash merchant week for a single location.
+/// Glendale store 32669627, Avondale store 27859030.
+/// Idempotent on location + week start. effectiveCommissionPct is a ratio (0.30 = 30%).
+model DoorDashWeeklyReport {
+  id                     String   @id @default(cuid())
+  locationId             String
+  location               Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  doorDashStoreId        String
+  weekStart              String // YYYY-MM-DD
+  weekEnd                String // YYYY-MM-DD, inclusive
+  subtotal               Float
+  gross                  Float
+  orderCount             Int
+  commission             Float
+  marketingFees          Float    @default(0)
+  errorCharges           Float    @default(0)
+  adjustments            Float    @default(0)
+  netPayout              Float
+  effectiveCommissionPct Float
+  deliveryOrders         Int?
+  pickupOrders           Int?
+  deliverySubtotal       Float?
+  pickupSubtotal         Float?
+  source                 String
+  importedAt             DateTime @default(now())
+
+  @@unique([locationId, weekStart])
+  @@index([locationId, weekStart])
 }
 
 /// One DoorDash vs in-store pricing report for a single location and date.

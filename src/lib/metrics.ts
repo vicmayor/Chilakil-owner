@@ -14,7 +14,7 @@ export type LocationMetrics = {
   name: string;
   shortName: string;
   gross: number;
-  deliveryGross: number;
+  deliveryGross: number | null;
   inStoreGross: number;
   fees: number;
   net: number;
@@ -29,6 +29,9 @@ export type LocationMetrics = {
   laborPct: number;
   foodCostPct: number;
   netPct: number;
+  sample: boolean;
+  updatedAt: string | null;
+  channelsKnown: boolean;
 };
 
 export type DashboardData = {
@@ -37,6 +40,8 @@ export type DashboardData = {
   locations: LocationMetrics[];
   combined: LocationMetrics | null;
   combinedLabel: string;
+  sample: boolean;
+  updatedAt: string | null;
 };
 
 const DELIVERY_CHANNELS = ["doordash", "ubereats", "grubhub"] as const;
@@ -63,17 +68,28 @@ function emptyMetrics(id: LocationId): LocationMetrics {
     laborPct: 0,
     foodCostPct: 0,
     netPct: 0,
+    sample: false,
+    updatedAt: null,
+    channelsKnown: true,
   };
 }
 
-function withRates(m: LocationMetrics): LocationMetrics {
+function withRates(m: LocationMetrics, preserveTicket = false): LocationMetrics {
   return {
     ...m,
-    averageTicket: m.orderCount > 0 ? m.gross / m.orderCount : 0,
+    averageTicket: preserveTicket ? m.averageTicket : m.orderCount > 0 ? m.gross / m.orderCount : 0,
     laborPct: m.gross > 0 ? m.labor / m.gross : 0,
     foodCostPct: m.gross > 0 ? m.foodCost / m.gross : 0,
     netPct: m.gross > 0 ? m.net / m.gross : 0,
   };
+}
+
+function latestTimestamp(values: Array<string | null>): string | null {
+  return values.reduce<string | null>((latest, value) => {
+    if (!value) return latest;
+    if (!latest || value > latest) return value;
+    return latest;
+  }, null);
 }
 
 export function sumMetrics(
@@ -86,7 +102,7 @@ export function sumMetrics(
       name: labelName,
       shortName: "Combined",
       gross: sum.gross + m.gross,
-      deliveryGross: sum.deliveryGross + m.deliveryGross,
+      deliveryGross: 0,
       inStoreGross: sum.inStoreGross + m.inStoreGross,
       fees: sum.fees + m.fees,
       net: sum.net + m.net,
@@ -101,11 +117,21 @@ export function sumMetrics(
       laborPct: 0,
       foodCostPct: 0,
       netPct: 0,
+      sample: false,
+      updatedAt: null,
+      channelsKnown: true,
     }),
     emptyMetrics("glendale"),
   );
   acc.name = labelName;
   acc.shortName = "Combined";
+  const deliveryKnown = parts.every((part) => part.channelsKnown && part.deliveryGross != null);
+  acc.deliveryGross = deliveryKnown
+    ? parts.reduce((sum, part) => sum + (part.deliveryGross ?? 0), 0)
+    : null;
+  acc.channelsKnown = deliveryKnown;
+  acc.sample = parts.some((part) => part.sample);
+  acc.updatedAt = latestTimestamp(parts.map((part) => part.updatedAt));
   const laborTargets = parts.map((p) => p.targetLaborPct);
   const foodTargets = parts.map((p) => p.targetFoodCostPct);
   acc.targetLaborPct =
@@ -123,20 +149,42 @@ export async function getDashboardData(
   const locations: LocationMetrics[] = [];
 
   for (const id of ids) {
-    const [sales, ops] = await Promise.all([
+    const [record, sales, ops] = await Promise.all([
+      prisma.dailySalesRecord.findUnique({
+        where: { locationId_date: { locationId: id, date } },
+      }),
       prisma.dailySales.findMany({ where: { locationId: id, date } }),
       prisma.dailyOps.findUnique({ where: { locationId_date: { locationId: id, date } } }),
     ]);
     const m = emptyMetrics(id);
-    for (const row of sales) {
-      m.gross += row.gross;
-      m.fees += row.fees;
-      m.net += row.net;
-      m.orderCount += row.orderCount;
-      if (row.channel === "in_store") m.inStoreGross += row.gross;
-      if ((DELIVERY_CHANNELS as readonly string[]).includes(row.channel)) {
-        m.deliveryGross += row.gross;
+    if (record) {
+      const channelGrosses = [record.doorDashGross, record.uberEatsGross, record.grubhubGross];
+      const channelsKnown = channelGrosses.some((value) => value != null) || record.inStoreGross != null;
+      m.gross = record.grossSales;
+      m.net = record.netSales;
+      m.fees = record.grossSales - record.netSales;
+      m.orderCount = record.orderCount;
+      m.averageTicket = record.averageTicket;
+      m.inStoreGross = record.inStoreGross ?? 0;
+      m.deliveryGross = channelsKnown
+        ? channelGrosses.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+        : null;
+      m.channelsKnown = channelsKnown;
+      m.sample = record.source === "sample";
+      m.updatedAt = record.importedAt.toISOString();
+    } else {
+      for (const row of sales) {
+        m.gross += row.gross;
+        m.fees += row.fees;
+        m.net += row.net;
+        m.orderCount += row.orderCount;
+        if (row.channel === "in_store") m.inStoreGross += row.gross;
+        if ((DELIVERY_CHANNELS as readonly string[]).includes(row.channel)) {
+          m.deliveryGross = (m.deliveryGross ?? 0) + row.gross;
+        }
       }
+      m.sample = sales.length > 0;
+      m.channelsKnown = true;
     }
     if (ops) {
       m.labor = ops.laborCost;
@@ -146,7 +194,7 @@ export async function getDashboardData(
       m.targetLaborPct = ops.targetLaborPct;
       m.targetFoodCostPct = ops.targetFoodCostPct;
     }
-    locations.push(withRates(m));
+    locations.push(withRates(m, Boolean(record)));
   }
 
   const combined = isCombinedScope(scope) ? sumMetrics(locations) : null;
@@ -157,6 +205,8 @@ export async function getDashboardData(
     locations,
     combined,
     combinedLabel: COMBINED_LABEL,
+    sample: locations.some((location) => location.sample),
+    updatedAt: latestTimestamp(locations.map((location) => location.updatedAt)),
   };
 }
 

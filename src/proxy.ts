@@ -9,7 +9,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/login/") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/icon" ||
-    pathname === "/apple-icon";
+    pathname === "/apple-icon" ||
+    pathname.startsWith("/api/ingest/");
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySessionToken(token) : null;

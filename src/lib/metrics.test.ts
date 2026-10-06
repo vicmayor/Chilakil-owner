@@ -22,6 +22,9 @@ function stub(partial: Partial<LocationMetrics> & Pick<LocationMetrics, "locatio
     laborPct: 0,
     foodCostPct: 0,
     netPct: 0,
+    sample: false,
+    updatedAt: null,
+    channelsKnown: true,
     ...partial,
   };
 }

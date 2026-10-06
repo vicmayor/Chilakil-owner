@@ -10,6 +10,14 @@ export function phoenixToday(now = new Date()): string {
   }).format(now);
 }
 
+/** Monday of the Phoenix calendar week that contains `iso` (Monday–Sunday). */
+export function phoenixMonday(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const delta = dow === 0 ? -6 : 1 - dow;
+  return shiftIsoDate(iso, delta);
+}
+
 export function shiftIsoDate(iso: string, deltaDays: number): string {
   const [year, month, day] = iso.split("-").map(Number);
   const utc = Date.UTC(year, month - 1, day + deltaDays);
@@ -37,6 +45,16 @@ export function formatShortDate(iso: string): string {
     weekday: "short",
     month: "short",
     day: "numeric",
+  }).format(dt);
+}
+
+export function formatPhoenixDateTime(dt: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TZ,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(dt);
 }
 

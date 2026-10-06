@@ -1,7 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { DOORDASH_PRICING_REPORTS } from "../src/data/doordash-pricing-reports";
-import { shiftIsoDate, phoenixToday } from "../src/lib/dates";
+import { phoenixMonday, phoenixToday, shiftIsoDate } from "../src/lib/dates";
+import { DOORDASH_STORE_IDS } from "../src/lib/doordash-stores";
+import { loadEnvFile } from "../src/lib/load-env";
+
+loadEnvFile();
 
 const prisma = new PrismaClient();
 
@@ -14,10 +18,24 @@ function round2(n: number) {
 
 async function main() {
   const today = phoenixToday();
-  const ownerEmail = process.env.OWNER_EMAIL ?? "owner@chilakil.com";
-  const ownerPassword = process.env.OWNER_PASSWORD ?? "ChilakilOwner1!";
-  const ownerName = process.env.OWNER_NAME ?? "Chilakil Owner";
+  await ensureLocations();
+  await ensureOwner();
 
+  if (process.env.SEED_SAMPLE !== "true") {
+    await seedDoorDashPricing();
+    console.log("Owner and locations are ready. Sample financials were not loaded.");
+    console.log("DoorDash pricing reports were refreshed. Set SEED_SAMPLE=true to load the local demo dataset.");
+    return;
+  }
+
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_SAMPLE_RESET !== "true") {
+    throw new Error(
+      "Refusing to load sample data when NODE_ENV=production. Unset SEED_SAMPLE, or set ALLOW_SAMPLE_RESET=true to override.",
+    );
+  }
+
+  await prisma.doorDashWeeklyReport.deleteMany();
+  await prisma.dailySalesRecord.deleteMany();
   await prisma.aiMessage.deleteMany();
   await prisma.aiThread.deleteMany();
   await prisma.alert.deleteMany();
@@ -39,43 +57,6 @@ async function main() {
   await prisma.doorDashPricingNote.deleteMany();
   await prisma.doorDashPricingLine.deleteMany();
   await prisma.doorDashPricingReport.deleteMany();
-  await prisma.location.deleteMany();
-  await prisma.user.deleteMany();
-
-  await prisma.location.createMany({
-    data: [
-      {
-        id: GLENDALE,
-        name: "Glendale Restaurant",
-        shortName: "Glendale",
-        type: "restaurant",
-        timezone: "America/Phoenix",
-        address: "5832 W Camelback Rd",
-        city: "Glendale, AZ",
-        phone: "(623) 555-0148",
-      },
-      {
-        id: AVONDALE,
-        name: "Avondale Food Trailer",
-        shortName: "Avondale",
-        type: "trailer",
-        timezone: "America/Phoenix",
-        address: "Civic Center Plaza (trailer pad)",
-        city: "Avondale, AZ",
-        phone: "(623) 555-0194",
-      },
-    ],
-  });
-
-  const passwordHash = await bcrypt.hash(ownerPassword, 12);
-  await prisma.user.create({
-    data: {
-      email: ownerEmail.toLowerCase(),
-      name: ownerName,
-      passwordHash,
-      role: "owner",
-    },
-  });
 
   type DayPlan = {
     offset: number;
@@ -289,6 +270,34 @@ async function main() {
         });
       }
 
+      const gross = Object.values(channels).reduce((sum, row) => sum + row.gross, 0);
+      const fees = Object.values(channels).reduce((sum, row) => sum + row.fees, 0);
+      const orders = Object.values(channels).reduce((sum, row) => sum + row.orders, 0);
+      await prisma.dailySalesRecord.create({
+        data: {
+          locationId: loc,
+          date,
+          grossSales: round2(gross),
+          netSales: round2(gross - fees),
+          discounts: 0,
+          refunds: 0,
+          tips: 0,
+          tax: null,
+          orderCount: orders,
+          averageTicket: orders > 0 ? round2(gross / orders) : 0,
+          inStoreGross: channels.in_store.gross,
+          inStoreOrders: channels.in_store.orders,
+          doorDashGross: channels.doordash.gross,
+          doorDashOrders: channels.doordash.orders,
+          uberEatsGross: channels.ubereats.gross,
+          uberEatsOrders: channels.ubereats.orders,
+          grubhubGross: channels.grubhub.gross,
+          grubhubOrders: channels.grubhub.orders,
+          source: "sample",
+          importedAt: new Date(),
+        },
+      });
+
       const dd = channels.doordash;
       const ue = channels.ubereats;
       const gh = channels.grubhub;
@@ -488,10 +497,120 @@ async function main() {
   await seedMarketing(today);
   await seedIntegrations();
   await seedAlerts(today);
+  await seedDoorDashWeeks(today);
   await seedDoorDashPricing();
 
-  console.log(`Seeded Chilakil Owner data for Phoenix date ${today}`);
-  console.log(`Owner login: ${ownerEmail}`);
+  console.log(`Seeded Chilakil Owner sample data for Phoenix date ${today}`);
+  console.log("Daily sales and DoorDash weeks are marked source=sample.");
+}
+
+async function ensureLocations() {
+  const rows = [
+    {
+      id: GLENDALE,
+      name: "Glendale Restaurant",
+      shortName: "Glendale",
+      type: "restaurant",
+      timezone: "America/Phoenix",
+      address: "5832 W Camelback Rd",
+      city: "Glendale, AZ",
+      phone: "(623) 555-0148",
+    },
+    {
+      id: AVONDALE,
+      name: "Avondale Food Trailer",
+      shortName: "Avondale",
+      type: "trailer",
+      timezone: "America/Phoenix",
+      address: "Civic Center Plaza (trailer pad)",
+      city: "Avondale, AZ",
+      phone: "(623) 555-0194",
+    },
+  ];
+  for (const row of rows) {
+    await prisma.location.upsert({
+      where: { id: row.id },
+      create: row,
+      update: row,
+    });
+  }
+}
+
+async function ensureOwner() {
+  const ownerEmail = process.env.OWNER_EMAIL?.trim();
+  const ownerPassword = process.env.OWNER_PASSWORD;
+  const ownerName = process.env.OWNER_NAME?.trim() || "Victor Mayorga";
+  if (!ownerEmail || !ownerPassword) {
+    throw new Error(
+      "OWNER_EMAIL and OWNER_PASSWORD are required. The seed will not create an owner with a built-in demo password.",
+    );
+  }
+  if (ownerPassword.length < 10) {
+    throw new Error("OWNER_PASSWORD must be at least 10 characters.");
+  }
+  const passwordHash = await bcrypt.hash(ownerPassword, 12);
+  await prisma.user.upsert({
+    where: { email: ownerEmail.toLowerCase() },
+    create: {
+      email: ownerEmail.toLowerCase(),
+      name: ownerName,
+      passwordHash,
+      role: "owner",
+    },
+    update: {
+      name: ownerName,
+      passwordHash,
+      role: "owner",
+    },
+  });
+  console.log(`Owner ready: ${ownerEmail.toLowerCase()}`);
+}
+
+async function seedDoorDashWeeks(today: string) {
+  const monday = phoenixMonday(today);
+  const weeks = [
+    { deltaWeeks: 0, gSub: 1840, gOrders: 41, gComm: 552, gMkt: 40, gErr: 12, aSub: 980, aOrders: 26, aComm: 323.4, aMkt: 25, aErr: 18 },
+    { deltaWeeks: 1, gSub: 6120, gOrders: 132, gComm: 1836, gMkt: 240, gErr: 55, aSub: 4380, aOrders: 108, aComm: 1445.4, aMkt: 190, aErr: 70 },
+    { deltaWeeks: 2, gSub: 5890, gOrders: 126, gComm: 1710, gMkt: 210, gErr: 40, aSub: 4010, aOrders: 99, aComm: 1283.2, aMkt: 160, aErr: 48 },
+    { deltaWeeks: 3, gSub: 5540, gOrders: 121, gComm: 1662, gMkt: 180, gErr: 36, aSub: 3760, aOrders: 94, aComm: 1240.8, aMkt: 150, aErr: 44 },
+  ];
+
+  for (const week of weeks) {
+    const weekStart = shiftIsoDate(monday, -7 * week.deltaWeeks);
+    const weekEnd = shiftIsoDate(weekStart, 6);
+    for (const loc of [GLENDALE, AVONDALE] as const) {
+      const subtotal = loc === GLENDALE ? week.gSub : week.aSub;
+      const orderCount = loc === GLENDALE ? week.gOrders : week.aOrders;
+      const commission = loc === GLENDALE ? week.gComm : week.aComm;
+      const marketingFees = loc === GLENDALE ? week.gMkt : week.aMkt;
+      const errorCharges = loc === GLENDALE ? week.gErr : week.aErr;
+      const deliveryOrders = Math.round(orderCount * (loc === GLENDALE ? 0.72 : 0.81));
+      const pickupOrders = orderCount - deliveryOrders;
+      await prisma.doorDashWeeklyReport.create({
+        data: {
+          locationId: loc,
+          doorDashStoreId: DOORDASH_STORE_IDS[loc],
+          weekStart,
+          weekEnd,
+          subtotal,
+          gross: subtotal,
+          orderCount,
+          commission,
+          marketingFees,
+          errorCharges,
+          adjustments: 0,
+          netPayout: round2(subtotal - commission - marketingFees - errorCharges),
+          effectiveCommissionPct: round2(commission / subtotal),
+          deliveryOrders,
+          pickupOrders,
+          deliverySubtotal: round2(subtotal * (deliveryOrders / orderCount)),
+          pickupSubtotal: round2(subtotal * (pickupOrders / orderCount)),
+          source: "sample",
+          importedAt: new Date(),
+        },
+      });
+    }
+  }
 }
 
 async function seedMenuAndRecipes() {
@@ -1180,6 +1299,9 @@ async function seedAlerts(today: string) {
 }
 
 async function seedDoorDashPricing() {
+  await prisma.doorDashPricingNote.deleteMany();
+  await prisma.doorDashPricingLine.deleteMany();
+  await prisma.doorDashPricingReport.deleteMany();
   for (const report of DOORDASH_PRICING_REPORTS) {
     await prisma.doorDashPricingReport.create({
       data: {
