@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { syncEmployeeHoursAction } from "@/app/actions/employee-hours";
 
 export function SyncHoursButton() {
@@ -29,16 +30,17 @@ export function SyncHoursButton() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex shrink-0 flex-col items-end gap-1">
       <button
         type="button"
         onClick={sync}
         disabled={pending}
-        className="inline-flex items-center justify-center rounded-full bg-chile px-4 text-sm font-bold text-ink disabled:opacity-60"
+        className="inline-flex items-center justify-center gap-1.5 rounded-full bg-chile px-4 text-sm font-extrabold text-ink shadow-[0_8px_18px_-10px_rgba(255,198,69,0.95)] disabled:opacity-60"
       >
+        <RefreshCw size={15} className={pending ? "animate-spin" : ""} aria-hidden />
         {pending ? "Syncing…" : "Sync now"}
       </button>
-      {message ? <p className="text-sm text-muted">{message}</p> : null}
+      {message ? <p className="text-xs font-bold text-chile">{message}</p> : null}
     </div>
   );
 }
