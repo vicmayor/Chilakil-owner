@@ -101,7 +101,7 @@ OWNER_NAME="Victor Mayorga" \
 npx prisma db seed
 ```
 
-Leave `SEED_SAMPLE` unset for that command. It upserts the two locations and the owner, and does not load demo sales.
+Leave `SEED_SAMPLE` unset for that command. It upserts the two locations and the owner, refreshes the food cost workbook, and does not load demo sales.
 
 7. Add to the iPhone Home Screen from Safari. Confirm the icon is the Chilakil mark.
 
@@ -117,6 +117,19 @@ npm run ingest -- ubereats-weekly examples/ubereats-weekly.json
 
 Example files live in `examples/`. `source` cannot be `sample` on these endpoints; that value is only for the local demo seed.
 
+## Food cost workbook
+
+The Food Cost screen reads `Ingredient`, `Recipe`, `RecipeIngredient`, and `MenuItem` rows imported from `data/chilakil-to-go-food-cost.xlsx` (Ingredient Prices, Recipe Costing, and Menu Summary). The workbook is shared pricing, so the seed copies it onto both Glendale and Avondale. Blank purchase costs stay blank. The importer does not fill Al Pastor, Chicken, or any other empty price.
+
+`npx prisma db seed` refreshes that import even when `SEED_SAMPLE` is unset. Each workbook row has a stable `sourceKey` per location. Re-running updates those ingredients, recipes, and menu items and replaces their recipe lines. It does not insert a second copy, and it leaves other menu rows (the sample menu) in place.
+
+When Victor updates the Excel file:
+
+1. Replace `data/chilakil-to-go-food-cost.xlsx` with the new workbook. Keep the sheet names Ingredient Prices, Recipe Costing, Menu Summary, and How to Use.
+2. From the repo root, with `DATABASE_URL`, `DIRECT_URL`, `OWNER_EMAIL`, and `OWNER_PASSWORD` set, run `npx prisma db seed`.
+
+Menu summary food cost uses the recipe sheet’s line costs, including the cached $0 to-go box line. Base cost with onion and cilantro uses the ingredient price list, so that box is included at its list price. The target is the Menu Summary “TARGET FOOD COST” cell (30%).
+
 ## Modules
 
 Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid.
@@ -125,7 +138,7 @@ Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid
 2. Sales — channel mix, 5-day trend, recent tickets
 3. DoorDash / 4. Uber Eats / 5. Grubhub — per-location daily summaries + secret-ref placeholders. DoorDash and Uber Eats also show merchant weeks, one card per location. ALL is the only view that adds a labeled combined total.
 6. Expenses
-7. Food Cost — theoretical vs purchases + recipe %
+7. Food Cost — theoretical vs purchases, menu food-cost %, recipe breakdown, ingredient prices, 30% target, and protein add-ons
 8. Menu & Recipes
 9. Customer Messages — EN/ES chrome; sensitive types require owner Approve / Edit / Reject
 10. Reviews
@@ -155,7 +168,8 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `UberEatsWeeklyReport` — one Uber Eats merchant week per location (unique on location + week start)
 - `DeliverySummary` — per location + platform + date
 - `DailyOps` — labor hours/cost, theoretical food cost, actual purchases, targets
-- `Expense`, `Ingredient`, `Recipe`, `RecipeIngredient`, `MenuItem`
+- `Expense`, `Ingredient`, `Recipe`, `RecipeIngredient`, `MenuItem` — workbook rows are keyed by `sourceKey`; a blank purchase cost stays null
+- `FoodCostProfile` — per-location workbook target (30%) and costing caveat
 - `CustomerMessage` — `language` `en|es`, sensitivity flags, draft/approved reply
 - `Review`, `MarketingCampaign`, `Employee`, `Shift`
 - `IntegrationConfig` — `secretRef` env var name only
