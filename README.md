@@ -125,7 +125,7 @@ Sync now, and `GET` or `POST /api/sync/employee-hours`, read:
 
 `GET {CHILAKIL_TEAM_API_URL}/api/v1/hours?periodStart=YYYY-MM-DD&location=glendale|avondale|all`
 
-with `Authorization: Bearer $CHILAKIL_TEAM_API_TOKEN`. The sync asks for `location=all` for the current Phoenix week and the previous seven weeks. `periodStart` is the Sunday. Rows are stored per employee id, location, and period, with each day’s clock in, clock out, and breaks. The same employee id may have a row at both locations. ALL shows those locations as separate labeled blocks. Labor % is that location’s gross pay estimate divided by its Square gross for the same dates. The estimate excludes overtime, tips, and taxes.
+with `Authorization: Bearer $CHILAKIL_TEAM_API_TOKEN`. The sync asks for `location=all` for the current Phoenix week and the previous seven weeks. `periodStart` is the Sunday. Rows are stored per employee id, location, and period, with each day’s clock in, clock out, and breaks. Those times are either `HH:MM` or an ISO timestamp with an offset, such as `2026-10-04T07:58:00-07:00`, and are stored as sent. The same employee id may have a row at both locations. ALL shows those locations as separate labeled blocks. Labor % is that location’s gross pay estimate divided by its Square gross for the same dates. The estimate excludes overtime, tips, and taxes.
 
 The sync route is for cron. It accepts `Authorization: Bearer $CRON_SECRET` or `Authorization: Bearer $INGEST_TOKEN`. It does not use the team token as its own password.
 

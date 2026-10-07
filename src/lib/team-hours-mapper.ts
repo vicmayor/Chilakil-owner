@@ -10,11 +10,16 @@ const isoDate = z
 /** Decimal(10, 2) column limit. */
 const amount = z.number().finite().nonnegative().max(99_999_999.99);
 
-const punchTime = z.string().trim().min(1).max(40).nullable();
+const punchTimeMessage = "Use HH:MM or an ISO timestamp with an offset";
+
+/** Plain clock, or a full timestamp such as 2026-10-04T07:58:00-07:00. Stored as sent. */
+const punchTimeText = z.string().trim().min(1).max(40).refine(isPunchTime, punchTimeMessage);
+
+const punchTime = punchTimeText.nullable();
 
 const breakSchema = z.object({
-  start: z.string().trim().min(1).max(40),
-  end: z.string().trim().min(1).max(40),
+  start: punchTimeText,
+  end: punchTimeText,
 });
 
 const daySchema = z.object({
@@ -156,6 +161,16 @@ export function mapTeamHoursResponse(input: unknown): MapHoursResult {
 
 function formatZod(error: z.ZodError): string {
   return error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ");
+}
+
+const CLOCK_HH_MM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const CLOCK_ISO =
+  /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+
+function isPunchTime(value: string): boolean {
+  if (CLOCK_HH_MM.test(value)) return true;
+  const iso = CLOCK_ISO.exec(value);
+  return iso != null && isRealIsoDate(iso[1]);
 }
 
 function isRealIsoDate(iso: string): boolean {

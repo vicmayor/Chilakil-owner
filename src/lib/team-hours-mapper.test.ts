@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fixture from "./fixtures/team-hours-period.json";
+import isoFixture from "./fixtures/team-hours-iso.json";
 import { phoenixSunday } from "./dates";
 import { createTeamHoursClient } from "./team-hours-client";
 import { mapTeamHoursResponse } from "./team-hours-mapper";
@@ -32,6 +33,34 @@ test("fixture maps Sunday–Saturday hours keyed by employee id and location", (
   assert.equal(avondaleMaria?.status, "approved");
   assert.equal(avondaleMaria?.days[0].breaks.length, 2);
   assert.equal(avondaleMaria?.totalHours, 6);
+});
+
+test("fixture maps ISO timestamps with an offset and still stores them as sent", () => {
+  const mapped = mapTeamHoursResponse(isoFixture);
+  assert.equal(mapped.ok, true);
+  if (!mapped.ok) return;
+
+  const maria = mapped.period.employees.find((employee) => employee.employeeId === "emp_maria");
+  assert.equal(maria?.days[0].clockIn, "2026-10-04T07:58:00-07:00");
+  assert.equal(maria?.days[0].clockOut, "2026-10-04T16:05:00-07:00");
+  assert.equal(maria?.days[0].breaks[0].start, "2026-10-04T12:00:00-07:00");
+  assert.equal(maria?.days[0].breaks[0].end, "2026-10-04T12:30:00-07:00");
+
+  const luis = mapped.period.employees.find((employee) => employee.employeeId === "emp_luis");
+  assert.equal(luis?.days[0].clockIn, "2026-10-05T11:00:00.000-07:00");
+  assert.equal(luis?.days[0].clockOut, "2026-10-05T15:00:00Z");
+
+  const missingOffset = mapTeamHoursResponse({
+    ...isoFixture,
+    employees: [
+      {
+        ...isoFixture.employees[0],
+        days: [{ ...isoFixture.employees[0].days[0], clockIn: "2026-10-04T07:58:00" }],
+      },
+    ],
+  });
+  assert.equal(missingOffset.ok, false);
+  if (!missingOffset.ok) assert.match(missingOffset.error, /HH:MM or an ISO timestamp/);
 });
 
 test("mapper rejects a non-Sunday period, a bad timezone, and a negative amount", () => {
