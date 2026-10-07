@@ -37,13 +37,13 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
             <li key={tab.href}>
               <Link
                 href={tab.href}
-                className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${
-                  active ? "text-chile" : "text-muted"
+                className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${
+                  active ? "text-ink" : "text-muted"
                 }`}
               >
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
                 {tab.href === "/messages" && inboxCount > 0 ? (
-                  <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-chile px-1 text-[10px] leading-4 text-white">
+                  <span className="absolute right-[18%] top-1.5 min-w-4 rounded-full bg-chile px-1 text-[10px] font-bold leading-4 text-ink">
                     {inboxCount}
                   </span>
                 ) : null}

@@ -7,10 +7,10 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-paper px-5 pb-[env(safe-area-inset-bottom)] pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-chile">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted">
           Chilakil To Go
         </p>
-        <h1 className="font-display mt-2 text-4xl font-semibold tracking-tight">
+        <h1 className="font-display mt-2 text-4xl font-extrabold tracking-tight">
           Owner
         </h1>
         <p className="mt-3 max-w-sm text-[15px] leading-6 text-muted">

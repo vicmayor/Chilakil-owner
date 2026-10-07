@@ -63,7 +63,7 @@ export async function DoorDashWeeklySection() {
           {combined ? (
             <Card>
               <CombinedBadge />
-              <p className="font-display mt-2 text-4xl font-semibold tabular">{moneyExact(combined.netPayout)}</p>
+              <p className="font-display mt-2 text-4xl font-extrabold tabular">{moneyExact(combined.netPayout)}</p>
               <p className="text-sm text-muted">{combined.label} · net payout</p>
               <p className="mt-1 text-base font-semibold">
                 Effective commission {pct(combined.effectiveCommissionPct)}
@@ -98,7 +98,7 @@ function WeekCard({ row }: { row: WeeklyReport }) {
       <p className="mt-1 text-xs text-muted">
         Store {row.doorDashStoreId} · {formatShortDate(row.weekStart)} – {formatShortDate(row.weekEnd)}
       </p>
-      <p className="font-display mt-2 text-4xl font-semibold tabular">{moneyExact(row.netPayout)}</p>
+      <p className="font-display mt-2 text-4xl font-extrabold tabular">{moneyExact(row.netPayout)}</p>
       <p className="text-sm text-muted">Net payout</p>
       <p className="mt-2 text-2xl font-semibold tabular">{pct(row.effectiveCommissionPct)}</p>
       <p className="text-sm text-muted">Effective commission</p>

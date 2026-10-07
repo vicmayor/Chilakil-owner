@@ -30,7 +30,7 @@ export default async function FoodCostPage() {
         {isCombinedScope(scope) && data.combined ? (
           <Card>
             <CombinedBadge />
-            <p className="font-display mt-2 text-3xl font-semibold tabular">
+            <p className="font-display mt-2 text-3xl font-extrabold tabular">
               {moneyExact(data.combined.foodCost)}
             </p>
             <p className="text-sm text-muted">
@@ -42,7 +42,7 @@ export default async function FoodCostPage() {
         {data.locations.map((loc) => (
           <Card key={loc.locationId}>
             <LocationDot id={loc.locationId} />
-            <p className="font-display mt-2 text-3xl font-semibold tabular">{moneyExact(loc.foodCost)}</p>
+            <p className="font-display mt-2 text-3xl font-extrabold tabular">{moneyExact(loc.foodCost)}</p>
             <p className="text-sm text-muted">
               Theoretical {pct(loc.foodCostPct)} · target {pct(loc.targetFoodCostPct)}
             </p>

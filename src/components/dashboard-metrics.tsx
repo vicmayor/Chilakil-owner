@@ -61,7 +61,7 @@ export function DashboardMetrics({ data }: { data: DashboardData }) {
     return (
       <div className="space-y-3">
         {stamp}
-        <div className="rounded-2xl border border-chile/20 bg-card p-4">
+        <div className="rounded-2xl border border-chile bg-card p-4">
           <Block m={data.combined} combined />
         </div>
         {data.locations.map((m) => (

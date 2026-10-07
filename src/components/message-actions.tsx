@@ -46,24 +46,24 @@ export function MessageActions({
           value={reply}
           onChange={(e) => setReply(e.target.value)}
           required
-          className="mt-1 w-full rounded-2xl border border-line bg-paper px-3 py-3 text-[15px] leading-6 outline-none ring-chile/30 focus:ring-2"
+          className="mt-1 w-full rounded-2xl border border-line bg-paper-2 px-3 py-3 text-[15px] leading-6 outline-none ring-ink/20 focus:ring-2"
         />
       </label>
       <BusyButton
         formAction={approveMessage}
-        className="flex w-full items-center justify-center rounded-2xl bg-chile text-sm font-semibold text-white"
+        className="flex w-full items-center justify-center rounded-full bg-chile text-sm font-bold text-ink"
       >
         {t.approve}
       </BusyButton>
       <BusyButton
         formAction={saveDraft}
-        className="flex w-full items-center justify-center rounded-2xl border border-line bg-card text-sm font-semibold"
+        className="flex w-full items-center justify-center rounded-full border border-line bg-card text-sm font-bold"
       >
         {t.edit}
       </BusyButton>
       <BusyButton
         formAction={rejectMessage}
-        className="flex w-full items-center justify-center rounded-2xl bg-danger-soft text-sm font-semibold text-danger"
+        className="flex w-full items-center justify-center rounded-full bg-danger-soft text-sm font-bold text-danger"
       >
         {t.reject}
       </BusyButton>

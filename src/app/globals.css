@@ -1,25 +1,26 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-paper: #f3ece3;
-  --color-paper-2: #e8dfd2;
-  --color-card: #fffbf6;
-  --color-ink: #1a1410;
-  --color-muted: #6b5f55;
-  --color-chile: #b1321c;
-  --color-chile-dark: #8a2414;
-  --color-mesa: #c4a574;
-  --color-sage: #2c6a4a;
-  --color-sage-soft: #e3f0e8;
+  /* Chilakil To Go — yellow / black / white from the customer ordering screen */
+  --color-paper: #ffffff;
+  --color-paper-2: #f5f5f5;
+  --color-card: #ffffff;
+  --color-ink: #000000;
+  --color-muted: #666666;
+  --color-chile: #ffc645;
+  --color-chile-dark: #e6b03a;
+  --color-mesa: #c8c8c8;
+  --color-sage: #1b7a3a;
+  --color-sage-soft: #eef6f1;
   --color-warn: #9a3412;
-  --color-warn-soft: #fde8d8;
+  --color-warn-soft: #fff4e5;
   --color-danger: #9f1239;
-  --color-danger-soft: #fce7ef;
-  --color-line: #ddd2c3;
-  --color-glendale: #b1321c;
-  --color-avondale: #b45309;
-  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --color-danger-soft: #fdecef;
+  --color-line: #e6e6e6;
+  --color-glendale: #000000;
+  --color-avondale: #ffc645;
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
@@ -47,7 +48,8 @@ textarea {
 }
 
 ::selection {
-  background: #f0c9bf;
+  background: #ffc645;
+  color: #000000;
 }
 
 .tabular {

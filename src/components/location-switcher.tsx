@@ -27,7 +27,7 @@ export function LocationSwitcher({ value }: { value: LocationScope }) {
     <div
       role="tablist"
       aria-label="Location"
-      className={`grid grid-cols-3 gap-1 rounded-2xl bg-paper-2 p-1 ${pending ? "opacity-70" : ""}`}
+      className={`grid grid-cols-3 gap-1 rounded-full bg-paper-2 p-1 ${pending ? "opacity-70" : ""}`}
     >
       {OPTIONS.map((opt) => {
         const active = value === opt.id;
@@ -38,16 +38,14 @@ export function LocationSwitcher({ value }: { value: LocationScope }) {
             role="tab"
             aria-selected={active}
             onClick={() => select(opt.id)}
-            className={`flex min-h-11 items-center justify-center rounded-xl px-1 text-[11px] font-bold tracking-wide ${
-              active
-                ? "bg-card text-ink shadow-sm"
-                : "text-muted"
+            className={`flex min-h-11 items-center justify-center rounded-full px-1 text-[11px] font-bold tracking-wide ${
+              active ? "bg-chile text-ink shadow-sm" : "text-muted"
             }`}
           >
             {opt.id !== "all" ? (
               <span
                 className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
-                  opt.id === "glendale" ? "bg-glendale" : "bg-avondale"
+                  opt.id === "glendale" ? "bg-glendale" : "bg-avondale ring-1 ring-ink"
                 }`}
               />
             ) : null}

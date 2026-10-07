@@ -33,7 +33,7 @@ export default async function MorePage() {
                   href={mod.href}
                   className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border border-line bg-card px-2 text-center"
                 >
-                  <Icon size={22} className="text-chile" />
+                  <Icon size={22} className="text-ink" />
                   <span className="text-[11px] font-semibold leading-4">{mod.label}</span>
                 </Link>
               );
@@ -64,7 +64,7 @@ export default async function MorePage() {
         <form action={logoutAction}>
           <button
             type="submit"
-            className="flex w-full items-center justify-center rounded-2xl border border-line bg-card text-sm font-semibold"
+            className="flex w-full items-center justify-center rounded-full border border-line bg-card text-sm font-bold"
           >
             Sign out
           </button>

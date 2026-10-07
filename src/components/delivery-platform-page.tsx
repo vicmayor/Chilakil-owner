@@ -52,7 +52,7 @@ export async function DeliveryPlatformPage({
         {isCombinedScope(scope) && todayRows.length > 1 ? (
           <Card>
             <CombinedBadge />
-            <p className="font-display mt-2 text-3xl font-semibold tabular">
+            <p className="font-display mt-2 text-3xl font-extrabold tabular">
               {moneyExact(todayRows.reduce((s, r) => s + r.gross, 0))}
             </p>
             <p className="text-sm text-muted">
@@ -76,7 +76,7 @@ export async function DeliveryPlatformPage({
           return (
             <Card key={id}>
               <LocationDot id={id} />
-              <p className="font-display mt-2 text-3xl font-semibold tabular">{moneyExact(row.gross)}</p>
+              <p className="font-display mt-2 text-3xl font-extrabold tabular">{moneyExact(row.gross)}</p>
               <p className="text-sm text-muted">
                 {number(row.orderCount)} orders · net {moneyExact(row.net)}
               </p>
@@ -107,7 +107,7 @@ export async function DeliveryPlatformPage({
                 </div>
               </dl>
               {integration ? (
-                <p className="mt-3 rounded-xl bg-paper px-3 py-2 text-xs text-muted">
+                <p className="mt-3 rounded-xl bg-paper-2 px-3 py-2 text-xs text-muted">
                   Integration: {integration.status}. Secret ref{" "}
                   <span className="font-medium text-ink">{integration.secretRef}</span>
                   {integration.storeRef ? ` · store ref ${integration.storeRef}` : ""}. No live
@@ -124,7 +124,7 @@ export async function DeliveryPlatformPage({
             {dates.map((date) => {
               const rows = summaries.filter((s) => s.date === date);
               return (
-                <li key={date} className="rounded-xl bg-paper px-3 py-2 text-sm">
+                <li key={date} className="rounded-xl bg-paper-2 px-3 py-2 text-sm">
                   <p className="text-xs font-semibold text-muted">{formatShortDate(date)}</p>
                   {ids.map((id) => {
                     const row = rows.find((r) => r.locationId === id);

@@ -27,7 +27,7 @@ export default async function EmployeesPage() {
         {isCombinedScope(scope) && data.combined ? (
           <Card>
             <CombinedBadge />
-            <p className="font-display mt-2 text-3xl font-semibold tabular">
+            <p className="font-display mt-2 text-3xl font-extrabold tabular">
               {moneyExact(data.combined.labor)}
             </p>
             <p className="text-sm text-muted">
@@ -39,7 +39,7 @@ export default async function EmployeesPage() {
         {data.locations.map((loc) => (
           <Card key={loc.locationId}>
             <LocationDot id={loc.locationId} />
-            <p className="font-display mt-2 text-3xl font-semibold tabular">{moneyExact(loc.labor)}</p>
+            <p className="font-display mt-2 text-3xl font-extrabold tabular">{moneyExact(loc.labor)}</p>
             <p className="text-sm text-muted">
               {loc.laborHours} hrs · {pct(loc.laborPct)} of gross · target {pct(loc.targetLaborPct)}
             </p>

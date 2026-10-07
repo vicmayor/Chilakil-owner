@@ -12,14 +12,14 @@ export function TopBar({
 }) {
   return (
     <header
-      className="sticky top-0 z-20 border-b border-line/80 bg-paper/90 px-4 pb-3 backdrop-blur-md"
+      className="sticky top-0 z-20 border-b border-line bg-card px-4 pb-3"
       style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
     >
       <div className="mx-auto max-w-lg">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-chile">
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted">
           Chilakil Owner
         </p>
-        <h1 className="font-display mt-0.5 text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="font-display mt-0.5 text-2xl font-extrabold tracking-tight">{title}</h1>
         {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
         <div className="mt-3">
           <LocationSwitcher value={scope} />
