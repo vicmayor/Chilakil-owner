@@ -50,6 +50,7 @@ model Location {
   dailySalesRecords     DailySalesRecord[]
   doorDashWeeklyReports DoorDashWeeklyReport[]
   pricingReports        DoorDashPricingReport[]
+  foodCostProfile       FoodCostProfile?
 }
 
 model Order {
@@ -132,37 +133,62 @@ model Expense {
 }
 
 model Ingredient {
-  id           String              @id @default(cuid())
-  locationId   String
-  location     Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  name         String
-  unit         String
-  costPerUnit  Float
-  onHand       Float
-  reorderPoint Float
-  vendor       String?
-  recipeLines  RecipeIngredient[]
+  id                String             @id @default(cuid())
+  locationId        String
+  location          Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name              String
+  unit              String
+  /// Null when the workbook purchase cost is blank. Never treat a blank cell as $0.
+  costPerUnit       Float?
+  onHand            Float
+  reorderPoint      Float
+  vendor            String?
+  purchaseQty       Float?
+  purchaseCost      Float?
+  /// Yield as a ratio. 1 = 100%.
+  yieldPct          Float?
+  addonPrice        Float?
+  portionQty        Float?
+  notes             String?
+  sourceKey         String?
+  sortOrder         Int                @default(0)
+  isStandardTopping Boolean            @default(false)
+  recipeLines       RecipeIngredient[]
+
+  @@unique([locationId, sourceKey])
 }
 
 model Recipe {
-  id          String             @id @default(cuid())
-  locationId  String
-  location    Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  name        String
-  yieldQty    Float              @default(1)
-  yieldUnit   String             @default("serving")
-  notes       String?
-  ingredients RecipeIngredient[]
-  menuItems   MenuItem[]
+  id                String             @id @default(cuid())
+  locationId        String
+  location          Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name              String
+  yieldQty          Float              @default(1)
+  yieldUnit         String             @default("serving")
+  notes             String?
+  packagingCost     Float              @default(0)
+  standardToppings  Boolean            @default(false)
+  sourceKey         String?
+  sortOrder         Int                @default(0)
+  ingredients       RecipeIngredient[]
+  menuItems         MenuItem[]
+
+  @@unique([locationId, sourceKey])
 }
 
 model RecipeIngredient {
-  id           String     @id @default(cuid())
-  recipeId     String
-  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  ingredientId String
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-  quantity     Float
+  id            String     @id @default(cuid())
+  recipeId      String
+  recipe        Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId  String
+  ingredient    Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  quantity      Float
+  sortOrder     Int        @default(0)
+  notes         String?
+  /// Recipe-sheet unit cost, including an explicit 0 when the sheet line is $0.
+  sheetUnitCost Float?
+  /// component | average_protein | packaging
+  kind          String     @default("component")
 }
 
 model MenuItem {
@@ -171,10 +197,26 @@ model MenuItem {
   location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
   name       String
   category   String
-  price      Float
+  /// Null when the workbook has no entered sell price.
+  price      Float?
   recipeId   String?
   recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
   active     Boolean  @default(true)
+  sourceKey  String?
+  sortOrder  Int      @default(0)
+
+  @@unique([locationId, sourceKey])
+}
+
+/// Sheet-level food cost settings for one location. Upserted with the workbook.
+model FoodCostProfile {
+  id                String   @id @default(cuid())
+  locationId        String   @unique
+  location          Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  targetFoodCostPct Float
+  caveat            String?
+  workbook          String
+  updatedAt         DateTime @updatedAt
 }
 
 model CustomerMessage {

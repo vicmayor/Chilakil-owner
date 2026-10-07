@@ -3,27 +3,106 @@ import { getLocationScope } from "@/lib/scope";
 import { locationIdsForScope, isCombinedScope, COMBINED_LABEL } from "@/lib/location";
 import { phoenixToday } from "@/lib/dates";
 import { moneyExact, pct } from "@/lib/format";
+import {
+  buildFoodCostReport,
+  foodCostSignature,
+  pricedRecipeCost,
+  type FoodCostInput,
+  type LineKind,
+} from "@/lib/food-cost";
 import { getDashboardData } from "@/lib/metrics";
 import { TopBar } from "@/components/top-bar";
 import { Card, CombinedBadge, LocationDot } from "@/components/ui";
+import { FoodCostWorkbook } from "@/components/food-cost-workbook";
 
 export const metadata = { title: "Food Cost" };
+
+function asKind(value: string): LineKind {
+  if (value === "average_protein" || value === "packaging") return value;
+  return "component";
+}
 
 export default async function FoodCostPage() {
   const scope = await getLocationScope();
   const ids = locationIdsForScope(scope);
-  const data = await getDashboardData(scope);
-  const items = await prisma.menuItem.findMany({
-    where: { locationId: { in: ids }, active: true },
-    include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
-    orderBy: { name: "asc" },
-  });
+  const [data, items, ingredients, profiles] = await Promise.all([
+    getDashboardData(scope),
+    prisma.menuItem.findMany({
+      where: { locationId: { in: ids }, active: true },
+      include: {
+        recipe: {
+          include: {
+            ingredients: { include: { ingredient: true }, orderBy: { sortOrder: "asc" } },
+          },
+        },
+      },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.ingredient.findMany({
+      where: { locationId: { in: ids }, sourceKey: { startsWith: "workbook:" } },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.foodCostProfile.findMany({ where: { locationId: { in: ids } } }),
+  ]);
+
+  const workbookGroups: { locationIds: string[]; input: FoodCostInput }[] = [];
+  for (const id of ids) {
+    const profile = profiles.find((row) => row.locationId === id);
+    const locationIngredients = ingredients.filter((row) => row.locationId === id && row.sourceKey);
+    const locationItems = items.filter((row) => row.locationId === id && row.sourceKey && row.recipe?.sourceKey);
+    if (!profile || locationIngredients.length === 0 || locationItems.length === 0) continue;
+    const input: FoodCostInput = {
+      targetFoodCostPct: profile.targetFoodCostPct,
+      caveat: profile.caveat,
+      ingredients: locationIngredients.map((row) => ({
+        sourceKey: row.sourceKey ?? "",
+        sortOrder: row.sortOrder,
+        name: row.name,
+        vendor: row.vendor,
+        purchaseQty: row.purchaseQty,
+        unit: row.unit,
+        purchaseCost: row.purchaseCost,
+        yieldPct: row.yieldPct,
+        costPerUnit: row.costPerUnit,
+        notes: row.notes,
+        addonPrice: row.addonPrice,
+        portionQty: row.portionQty,
+        isStandardTopping: row.isStandardTopping,
+      })),
+      menuItems: locationItems.map((item) => ({
+        sourceKey: item.sourceKey ?? "",
+        recipeKey: item.recipe?.sourceKey ?? "",
+        sortOrder: item.sortOrder,
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        packagingCost: item.recipe?.packagingCost ?? 0,
+        standardToppings: item.recipe?.standardToppings ?? false,
+        notes: item.recipe?.notes ?? null,
+        lines: (item.recipe?.ingredients ?? []).map((line) => ({
+          ingredientKey: line.ingredient.sourceKey ?? line.ingredientId,
+          quantity: line.quantity,
+          unit: line.ingredient.unit,
+          sheetUnitCost: line.sheetUnitCost,
+          notes: line.notes,
+          kind: asKind(line.kind),
+          sortOrder: line.sortOrder,
+        })),
+      })),
+    };
+    const signature = foodCostSignature(input);
+    const existing = workbookGroups.find((group) => foodCostSignature(group.input) === signature);
+    if (existing) existing.locationIds.push(id);
+    else workbookGroups.push({ locationIds: [id], input });
+  }
+
+  const otherItems = items.filter((item) => !item.sourceKey);
 
   return (
     <>
       <TopBar
         title="Food cost"
-        subtitle={`Theoretical vs purchases · ${phoenixToday()}`}
+        subtitle={`Menu costing · target from the workbook · ${phoenixToday()}`}
         scope={scope}
       />
       <main className="space-y-4 px-4 py-4">
@@ -53,34 +132,58 @@ export default async function FoodCostPage() {
           </Card>
         ))}
 
+        {workbookGroups.length === 0 ? (
+          <Card>
+            <h2 className="text-sm font-semibold">Chilakil menu costing</h2>
+            <p className="mt-1 text-sm text-muted">
+              The food cost workbook is not in this database yet. Run the seed to load it.
+            </p>
+          </Card>
+        ) : (
+          workbookGroups.map((group) => (
+            <FoodCostWorkbook
+              key={group.locationIds.join("-")}
+              locationIds={group.locationIds}
+              report={buildFoodCostReport(group.input)}
+            />
+          ))
+        )}
+
         {ids.map((id) => {
-          const rows = items
-            .filter((i) => i.locationId === id)
+          const rows = otherItems
+            .filter((item) => item.locationId === id)
             .map((item) => {
-              const cost =
-                item.recipe?.ingredients.reduce(
-                  (s, line) => s + line.quantity * line.ingredient.costPerUnit,
-                  0,
-                ) ?? 0;
-              return { item, cost, pct: item.price > 0 ? cost / item.price : 0 };
+              const cost = item.recipe
+                ? pricedRecipeCost(
+                    item.recipe.ingredients.map((line) => ({
+                      quantity: line.quantity,
+                      sheetUnitCost: line.sheetUnitCost,
+                      catalogUnitCost: line.ingredient.costPerUnit,
+                    })),
+                    item.recipe.packagingCost,
+                  )
+                : null;
+              const foodPct = item.price != null && item.price > 0 && cost != null ? cost / item.price : null;
+              return { item, cost, foodPct };
             })
-            .sort((a, b) => b.pct - a.pct);
+            .sort((a, b) => (b.foodPct ?? -1) - (a.foodPct ?? -1));
+          if (rows.length === 0) return null;
           return (
             <Card key={id}>
               <h2 className="text-sm font-semibold">
-                <LocationDot id={id} />
+                <LocationDot id={id} /> other recipes
               </h2>
               <ul className="mt-2 divide-y divide-line">
-                {rows.map(({ item, cost, pct: p }) => (
+                {rows.map(({ item, cost, foodPct }) => (
                   <li key={item.id} className="flex items-center justify-between py-2.5">
                     <div>
                       <p className="text-sm font-medium">{item.name}</p>
                       <p className="text-xs text-muted">
-                        Sell {moneyExact(item.price)} · recipe {moneyExact(cost)}
+                        Sell {item.price == null ? "—" : moneyExact(item.price)} · recipe {cost == null ? "—" : moneyExact(cost)}
                       </p>
                     </div>
-                    <p className={`tabular text-sm font-semibold ${p > 0.32 ? "text-warn" : "text-sage"}`}>
-                      {pct(p)}
+                    <p className={`tabular text-sm font-semibold ${foodPct != null && foodPct > 0.32 ? "text-warn" : "text-sage"}`}>
+                      {foodPct == null ? "—" : pct(foodPct)}
                     </p>
                   </li>
                 ))}

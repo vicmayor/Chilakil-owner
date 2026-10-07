@@ -8,6 +8,7 @@ import {
   LOCATIONS,
   type LocationScope,
 } from "@/lib/location";
+import { pricedRecipeCost } from "@/lib/food-cost";
 import { getDashboardData } from "@/lib/metrics";
 
 function moneyMaybe(amount: number | null): string {
@@ -99,19 +100,27 @@ export async function buildSnapshot(scope: LocationScope): Promise<BusinessSnaps
     }),
   ]);
 
-  const menuCosting = menuItems.map((item) => {
-    const recipeCost =
-      item.recipe?.ingredients.reduce(
-        (sum, line) => sum + line.quantity * line.ingredient.costPerUnit,
-        0,
-      ) ?? 0;
-    return {
-      locationId: item.locationId,
-      name: item.name,
-      price: item.price,
-      recipeCost,
-      foodCostPct: item.price > 0 ? recipeCost / item.price : 0,
-    };
+  const menuCosting = menuItems.flatMap((item) => {
+    const recipeCost = item.recipe
+      ? pricedRecipeCost(
+          item.recipe.ingredients.map((line) => ({
+            quantity: line.quantity,
+            sheetUnitCost: line.sheetUnitCost,
+            catalogUnitCost: line.ingredient.costPerUnit,
+          })),
+          item.recipe.packagingCost,
+        )
+      : null;
+    if (item.price == null || item.price <= 0 || recipeCost == null) return [];
+    return [
+      {
+        locationId: item.locationId,
+        name: item.name,
+        price: item.price,
+        recipeCost,
+        foodCostPct: recipeCost / item.price,
+      },
+    ];
   });
 
   const notice = isCombinedScope(scope)

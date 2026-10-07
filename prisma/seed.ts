@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { DOORDASH_PRICING_REPORTS } from "../src/data/doordash-pricing-reports";
 import { phoenixMonday, phoenixToday, shiftIsoDate } from "../src/lib/dates";
 import { DOORDASH_STORE_IDS } from "../src/lib/doordash-stores";
+import { importFoodCostWorkbook } from "../src/lib/food-cost-import";
 import { loadEnvFile } from "../src/lib/load-env";
 
 loadEnvFile();
@@ -23,8 +24,9 @@ async function main() {
 
   if (process.env.SEED_SAMPLE !== "true") {
     await seedDoorDashPricing();
+    await seedFoodCostWorkbook();
     console.log("Owner and locations are ready. Sample financials were not loaded.");
-    console.log("DoorDash pricing reports were refreshed. Set SEED_SAMPLE=true to load the local demo dataset.");
+    console.log("DoorDash pricing reports and the food cost workbook were refreshed. Set SEED_SAMPLE=true to load the local demo dataset.");
     return;
   }
 
@@ -499,9 +501,17 @@ async function main() {
   await seedAlerts(today);
   await seedDoorDashWeeks(today);
   await seedDoorDashPricing();
+  await seedFoodCostWorkbook();
 
   console.log(`Seeded Chilakil Owner sample data for Phoenix date ${today}`);
   console.log("Daily sales and DoorDash weeks are marked source=sample.");
+}
+
+async function seedFoodCostWorkbook() {
+  const result = await importFoodCostWorkbook(prisma);
+  console.log(
+    `Food cost workbook refreshed for ${result.locations} locations (${result.menuItems} menu items, ${result.ingredients} ingredients). Re-running updates those rows and does not duplicate them.`,
+  );
 }
 
 async function ensureLocations() {
