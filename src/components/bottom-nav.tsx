@@ -81,12 +81,13 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
             aria-label={REFRESH_NAV_LABEL}
             className={`${itemClass} ${refreshing ? "text-ink" : "text-muted"}`}
           >
-            <RefreshCw
-              size={20}
-              strokeWidth={refreshing ? 2.4 : 1.8}
-              aria-hidden
-              className={`shrink-0 ${refreshing ? "animate-spin" : ""}`}
-            />
+            <span
+              className={`inline-flex shrink-0 items-center justify-center rounded-full ${
+                refreshing ? "size-6 animate-spin bg-chile text-ink" : ""
+              }`}
+            >
+              <RefreshCw size={20} strokeWidth={refreshing ? 2.4 : 1.8} aria-hidden />
+            </span>
             <span className="max-w-full truncate">{REFRESH_NAV_LABEL}</span>
           </button>
         </li>

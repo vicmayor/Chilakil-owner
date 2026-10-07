@@ -16,7 +16,7 @@ export const REFRESH_NAV_LABEL = "Refresh";
 export const REFRESH_QUERY_PARAM = "_refresh";
 
 /** Long enough that the nav icon spin is visible before the document unloads. */
-export const REFRESH_SPIN_MS = 700;
+export const REFRESH_SPIN_MS = 1100;
 
 /** Cap worker/cache work so a stuck `registration.update()` still reloads. */
 export const REFRESH_WORK_TIMEOUT_MS = 2500;
