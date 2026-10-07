@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildFoodCostReport } from "./food-cost";
+import { buildFoodCostReport, withFoodCostEdits } from "./food-cost";
 import { loadFoodCostWorkbook } from "./food-cost-workbook";
 
 const workbook = loadFoodCostWorkbook();
@@ -106,6 +106,66 @@ test("base costs add onion and cilantro, and protein add-ons keep the sheet econ
   close(chilaquilesChorizo?.totalCost ?? null, 5.357767857142857);
   close(burritoAsada?.sellPrice ?? null, 15);
   close(burritoAsada?.totalCost ?? null, 6.085267857142856);
+});
+
+test("protein add-ons follow workbook rows when sample plates are absent", () => {
+  const names = report.proteins.map((row) => row.name).sort();
+  assert.deepEqual(names, ["Al Pastor", "Carne Asada", "Chorizo"]);
+  const withoutSamplePlates = {
+    ...workbook,
+    menuItems: workbook.menuItems.filter((item) => !/taco|quesadilla|thigh|pastor pork/i.test(item.name)),
+  };
+  assert.deepEqual(
+    buildFoodCostReport(withoutSamplePlates).proteins.map((row) => row.name).sort(),
+    names,
+  );
+  assert.ok(withoutSamplePlates.menuItems.some((item) => item.name === "Build Your Own Chilaquiles"));
+});
+
+test("a unit-cost what-if stays on one copy of the workbook", () => {
+  const pastor = workbook.ingredients.find((row) => row.name === "Al Pastor" && row.costPerUnit != null);
+  const asada = workbook.ingredients.find((row) => row.name === "Carne Asada" && row.portionQty != null);
+  assert.ok(pastor && asada);
+  const glendale = withFoodCostEdits(workbook, {
+    costPerUnit: { [pastor.sourceKey]: 0.75 },
+    prices: {},
+    addonPrices: {},
+  });
+  const glendaleReport = buildFoodCostReport(glendale);
+  const avondaleReport = buildFoodCostReport(workbook);
+  close(glendaleReport.proteins.find((row) => row.name === "Al Pastor")?.portionCost ?? null, 3);
+  close(avondaleReport.proteins.find((row) => row.name === "Al Pastor")?.portionCost ?? null, 2);
+  close(glendaleReport.proteins.find((row) => row.name === "Carne Asada")?.portionCost ?? null, 2);
+  assert.equal(workbook.ingredients.find((row) => row.sourceKey === pastor.sourceKey)?.costPerUnit, 0.5);
+
+  const byoKey = workbook.menuItems.find((item) => item.name === "Build Your Own Chilaquiles")?.sourceKey;
+  assert.ok(byoKey);
+  const repriced = buildFoodCostReport(
+    withFoodCostEdits(workbook, {
+      costPerUnit: {},
+      prices: { [byoKey]: 15 },
+      addonPrices: {},
+    }),
+  );
+  assert.equal(repriced.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.price, 15);
+  assert.equal(report.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.price, 12);
+
+  const average = workbook.ingredients.find((row) => row.name === "Average Protein");
+  assert.ok(average?.sourceKey);
+  const withProtein = buildFoodCostReport(
+    withFoodCostEdits(workbook, {
+      costPerUnit: { [average.sourceKey]: (average.costPerUnit ?? 0) + 1 },
+      prices: {},
+      addonPrices: {},
+    }),
+  );
+  const before = report.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.menuCost ?? 0;
+  const after = withProtein.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.menuCost ?? 0;
+  assert.ok(after > before);
+  const plateBefore = report.plates.find((row) => row.label === "Chilaquiles + Al Pastor")?.totalCost ?? 0;
+  const plateAfter = glendaleReport.plates.find((row) => row.label === "Chilaquiles + Al Pastor")?.totalCost ?? 0;
+  assert.ok(plateAfter > plateBefore);
+  assert.equal(asada.name, "Carne Asada");
 });
 
 test("empty template items stay unpriced", () => {

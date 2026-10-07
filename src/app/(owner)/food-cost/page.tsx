@@ -1,19 +1,13 @@
 import { prisma } from "@/lib/db";
 import { getLocationScope } from "@/lib/scope";
-import { locationIdsForScope, isCombinedScope, COMBINED_LABEL } from "@/lib/location";
+import { locationIdsForScope, isCombinedScope, COMBINED_LABEL, isLocationId } from "@/lib/location";
 import { phoenixToday } from "@/lib/dates";
 import { moneyExact, pct } from "@/lib/format";
-import {
-  buildFoodCostReport,
-  foodCostSignature,
-  pricedRecipeCost,
-  type FoodCostInput,
-  type LineKind,
-} from "@/lib/food-cost";
+import { pricedRecipeCost, type LineKind } from "@/lib/food-cost";
 import { getDashboardData } from "@/lib/metrics";
 import { TopBar } from "@/components/top-bar";
 import { Card, CombinedBadge, LocationDot } from "@/components/ui";
-import { FoodCostWorkbook } from "@/components/food-cost-workbook";
+import { FoodCostSimulator, type SimulatorLocation } from "@/components/food-cost-simulator";
 
 export const metadata = { title: "Food Cost" };
 
@@ -45,16 +39,19 @@ export default async function FoodCostPage() {
     prisma.foodCostProfile.findMany({ where: { locationId: { in: ids } } }),
   ]);
 
-  const workbookGroups: { locationIds: string[]; input: FoodCostInput }[] = [];
+  const kitchens: SimulatorLocation[] = [];
   for (const id of ids) {
+    if (!isLocationId(id)) continue;
     const profile = profiles.find((row) => row.locationId === id);
     const locationIngredients = ingredients.filter((row) => row.locationId === id && row.sourceKey);
     const locationItems = items.filter((row) => row.locationId === id && row.sourceKey && row.recipe?.sourceKey);
-    if (!profile || locationIngredients.length === 0 || locationItems.length === 0) continue;
-    const input: FoodCostInput = {
+    if (!profile || locationIngredients.length === 0) continue;
+    kitchens.push({
+      locationId: id,
       targetFoodCostPct: profile.targetFoodCostPct,
       caveat: profile.caveat,
       ingredients: locationIngredients.map((row) => ({
+        id: row.id,
         sourceKey: row.sourceKey ?? "",
         sortOrder: row.sortOrder,
         name: row.name,
@@ -69,7 +66,8 @@ export default async function FoodCostPage() {
         portionQty: row.portionQty,
         isStandardTopping: row.isStandardTopping,
       })),
-      menuItems: locationItems.map((item) => ({
+      items: locationItems.map((item) => ({
+        id: item.id,
         sourceKey: item.sourceKey ?? "",
         recipeKey: item.recipe?.sourceKey ?? "",
         sortOrder: item.sortOrder,
@@ -89,11 +87,7 @@ export default async function FoodCostPage() {
           sortOrder: line.sortOrder,
         })),
       })),
-    };
-    const signature = foodCostSignature(input);
-    const existing = workbookGroups.find((group) => foodCostSignature(group.input) === signature);
-    if (existing) existing.locationIds.push(id);
-    else workbookGroups.push({ locationIds: [id], input });
+    });
   }
 
   const otherItems = items.filter((item) => !item.sourceKey);
@@ -132,7 +126,7 @@ export default async function FoodCostPage() {
           </Card>
         ))}
 
-        {workbookGroups.length === 0 ? (
+        {kitchens.length === 0 ? (
           <Card>
             <h2 className="text-sm font-semibold">Chilakil menu costing</h2>
             <p className="mt-1 text-sm text-muted">
@@ -140,13 +134,7 @@ export default async function FoodCostPage() {
             </p>
           </Card>
         ) : (
-          workbookGroups.map((group) => (
-            <FoodCostWorkbook
-              key={group.locationIds.join("-")}
-              locationIds={group.locationIds}
-              report={buildFoodCostReport(group.input)}
-            />
-          ))
+          <FoodCostSimulator key={ids.join("-")} locations={kitchens} />
         )}
 
         {ids.map((id) => {
@@ -179,10 +167,13 @@ export default async function FoodCostPage() {
                     <div>
                       <p className="text-sm font-medium">{item.name}</p>
                       <p className="text-xs text-muted">
-                        Sell {item.price == null ? "—" : moneyExact(item.price)} · recipe {cost == null ? "—" : moneyExact(cost)}
+                        Sell {item.price == null ? "—" : moneyExact(item.price)} · recipe{" "}
+                        {cost == null ? "—" : moneyExact(cost)}
                       </p>
                     </div>
-                    <p className={`tabular text-sm font-semibold ${foodPct != null && foodPct > 0.32 ? "text-warn" : "text-sage"}`}>
+                    <p
+                      className={`tabular text-sm font-semibold ${foodPct != null && foodPct > 0.32 ? "text-warn" : "text-sage"}`}
+                    >
                       {foodPct == null ? "—" : pct(foodPct)}
                     </p>
                   </li>

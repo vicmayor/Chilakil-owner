@@ -308,3 +308,51 @@ function addPackaging(cost: number | null, packaging: number): number | null {
   if (cost == null) return null;
   return cost + packaging;
 }
+
+export const MAX_MONEY_INPUT = 10_000;
+
+export type FoodCostEdits = {
+  /** Ingredient sourceKey -> unit cost. Null leaves that workbook cell blank. */
+  costPerUnit: Record<string, number | null>;
+  /** Menu sourceKey -> sell price. */
+  prices: Record<string, number | null>;
+  /** Ingredient sourceKey -> protein add-on sell price. */
+  addonPrices: Record<string, number | null>;
+};
+
+/**
+ * Apply a what-if on top of one kitchen's workbook. Protein add-ons are the
+ * ingredient rows that already carry a portion and an add-on price; this does
+ * not look up menu names. A changed unit cost also replaces that ingredient's
+ * recipe-sheet unit cost so plate costs follow the edit.
+ */
+export function withFoodCostEdits(input: FoodCostInput, edits: FoodCostEdits): FoodCostInput {
+  const changedCosts = new Map<string, number | null>();
+  const ingredients = input.ingredients.map((row) => {
+    const hasCost = Object.prototype.hasOwnProperty.call(edits.costPerUnit, row.sourceKey);
+    const hasAddon = Object.prototype.hasOwnProperty.call(edits.addonPrices, row.sourceKey);
+    const costPerUnit = hasCost ? edits.costPerUnit[row.sourceKey] : row.costPerUnit;
+    const addonPrice = hasAddon ? edits.addonPrices[row.sourceKey] : row.addonPrice;
+    if (hasCost && costPerUnit !== row.costPerUnit) changedCosts.set(row.sourceKey, costPerUnit);
+    return { ...row, costPerUnit, addonPrice };
+  });
+
+  const menuItems = input.menuItems.map((item) => {
+    const hasPrice = Object.prototype.hasOwnProperty.call(edits.prices, item.sourceKey);
+    return {
+      ...item,
+      price: hasPrice ? edits.prices[item.sourceKey] : item.price,
+      lines: item.lines.map((line) => {
+        if (!changedCosts.has(line.ingredientKey)) return { ...line };
+        return { ...line, sheetUnitCost: changedCosts.get(line.ingredientKey) ?? null };
+      }),
+    };
+  });
+
+  return {
+    targetFoodCostPct: input.targetFoodCostPct,
+    caveat: input.caveat,
+    ingredients,
+    menuItems,
+  };
+}
