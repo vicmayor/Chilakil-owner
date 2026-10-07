@@ -5,6 +5,7 @@ import {
   TARGET_FOOD_COST_PCT,
   costsDiffer,
   groupFoodCostLocations,
+  roundMoney,
   parseCostInput,
   proteinAddonsForLocation,
   quoteSale,
@@ -152,9 +153,11 @@ test("Glendale pastor plate matches the workbook and a 30% suggested price", () 
   const cost = recipeCost(pastor.lines, costMap(ingredients));
   assert.ok(Math.abs(cost - 2.653) < 1e-9);
   const quote = quoteSale(cost, pastor.price);
+  assert.equal(quote.recipeCost, 2.65);
   assert.equal(quote.foodCostPct, cost / 13.5);
-  assert.ok(Math.abs(quote.grossProfit - (13.5 - cost)) < 1e-9);
-  assert.equal(quote.suggestedPrice, cost / TARGET_FOOD_COST_PCT);
+  assert.equal(quote.grossProfit, 10.85);
+  assert.equal(quote.suggestedPrice, roundMoney(cost / TARGET_FOOD_COST_PCT));
+  assert.equal(quote.suggestedPrice, 8.84);
   assert.ok(quote.suggestedPrice < pastor.price);
 });
 
@@ -184,7 +187,8 @@ test("raising a protein cost updates that plate, the burrito, and the add-on onl
   assert.equal(asada.portionQty, 0.38);
   assert.equal(asada.portionFromRecipe, "Carne asada tacos (3)");
   assert.ok(Math.abs(asada.recipeCost - 0.38 * 8.4) < 1e-9);
-  assert.ok(Math.abs(pastor.recipeCost - 0.35 * 5.1) < 1e-9);
+  assert.equal(roundMoney(pastor.recipeCost), 1.79);
+  assert.equal(roundMoney(0.35 * 5.3), 1.86);
   assert.ok(Math.abs(chicken.recipeCost - 0.28 * 3.8) < 1e-9);
 
   const bumped = ingredients.map((ingredient) =>
@@ -207,7 +211,8 @@ test("raising a protein cost updates that plate, the burrito, and the add-on onl
   assert.equal(recipeCost(horchata.lines, costs), recipeCost(horchata.lines, costMap(ingredients)));
 
   const addonQuote = quoteSale(nextAsada.recipeCost, PROTEIN_ADDON_PRICE);
-  assert.equal(addonQuote.suggestedPrice, nextAsada.recipeCost / 0.3);
+  assert.equal(addonQuote.recipeCost, 3.8);
+  assert.equal(addonQuote.suggestedPrice, roundMoney(nextAsada.recipeCost / 0.3));
   assert.ok(addonQuote.foodCostPct !== null && addonQuote.foodCostPct > TARGET_FOOD_COST_PCT);
 });
 

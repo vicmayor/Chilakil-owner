@@ -104,6 +104,16 @@ export function costsDiffer(a: number, b: number): boolean {
   return Math.abs(a - b) > 0.000001;
 }
 
+/**
+ * Nearest cent. A tiny bias corrects binary values that land a hair under a
+ * half-cent (0.35 lb × $5.10 is 1.785, but the float is 1.7849999999999997).
+ */
+export function roundMoney(amount: number): number {
+  if (!Number.isFinite(amount)) return amount;
+  const cents = amount * 100;
+  return Math.round(cents + Math.sign(cents) * 1e-6) / 100;
+}
+
 export function recipeCost(lines: RecipeLine[], costPerUnitById: ReadonlyMap<string, number>): number {
   let total = 0;
   for (const line of lines) {
@@ -112,12 +122,13 @@ export function recipeCost(lines: RecipeLine[], costPerUnitById: ReadonlyMap<str
   return total;
 }
 
-export function quoteSale(recipeCost: number, price: number, target = TARGET_FOOD_COST_PCT): CostQuote {
+export function quoteSale(rawCost: number, price: number, target = TARGET_FOOD_COST_PCT): CostQuote {
+  const recipeCost = roundMoney(rawCost);
   return {
     recipeCost,
-    foodCostPct: price > 0 ? recipeCost / price : null,
-    grossProfit: price - recipeCost,
-    suggestedPrice: target > 0 ? recipeCost / target : recipeCost,
+    foodCostPct: price > 0 ? rawCost / price : null,
+    grossProfit: roundMoney(price - recipeCost),
+    suggestedPrice: roundMoney(target > 0 ? rawCost / target : rawCost),
   };
 }
 

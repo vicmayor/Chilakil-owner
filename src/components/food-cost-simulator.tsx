@@ -16,6 +16,7 @@ import {
   proteinAddonsForLocation,
   quoteSale,
   recipeCost,
+  roundMoney,
   type FoodCostIngredient,
   type FoodCostLocation,
   type FoodCostMenuItem,
@@ -429,7 +430,9 @@ function MenuQuote({
                     {formatQty(line.quantity)} {line.unit}
                   </span>
                 </span>
-                <span className="tabular">{lineInvalid ? "—" : moneyExact(line.quantity * unitCost)}</span>
+                <span className="tabular">
+                  {lineInvalid ? "—" : moneyExact(roundMoney(line.quantity * unitCost))}
+                </span>
               </li>
             );
           })}
