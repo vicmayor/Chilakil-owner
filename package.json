@@ -15,7 +15,8 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "setup": "prisma generate && prisma migrate deploy && prisma db seed",
-    "ingest": "tsx scripts/ingest.ts"
+    "ingest": "tsx scripts/ingest.ts",
+    "food-cost:import": "tsx scripts/import-food-cost.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

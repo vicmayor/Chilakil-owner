@@ -278,6 +278,8 @@ function KitchenSimulator({
   });
   const canSave = workbookDirty && parsed.invalidKeys.length === 0;
   const targetLabel = pct(location.targetFoodCostPct, 0);
+  const costedMenu = location.items.filter((item) => item.lines.length > 0);
+  const openMenu = location.items.filter((item) => item.lines.length === 0);
 
   return (
     <section className="space-y-3" data-location={location.locationId} aria-label={name}>
@@ -357,48 +359,43 @@ function KitchenSimulator({
         )}
       </div>
 
-      <h4 className="px-1 text-sm font-semibold">Menu prices</h4>
-      {location.items.map((item) => {
-        const row = report.menu.find((entry) => entry.sourceKey === item.sourceKey);
-        const priceInvalid = parsed.invalidKeys.includes(`price:${item.sourceKey}`);
-        const livePrice = parsed.prices.get(item.sourceKey);
-        const priceDirty = livePrice !== undefined && moneyDiffer(livePrice ?? null, item.price);
-        const over = row?.foodCostPct != null && row.foodCostPct > location.targetFoodCostPct;
-        return (
-          <article key={item.id} className="rounded-2xl border border-line bg-card p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">{item.category}</p>
-            <h5 className="font-display text-lg font-extrabold leading-tight">{item.name}</h5>
-            <div className="mt-3">
-              <MoneyField
-                id={`${location.locationId}-price-${item.sourceKey}`}
-                label={`${item.name} selling price`}
-                caption="Selling price"
-                value={draft.prices[item.sourceKey] ?? ""}
-                invalid={priceInvalid}
-                dirty={priceDirty}
-                onChange={(value) => onPrice(item.sourceKey, value)}
-              />
-              {priceDirty ? (
-                <p className="mt-1 text-xs text-muted">
-                  Saved sell {item.price == null ? "blank" : moneyExact(item.price)}
-                </p>
-              ) : null}
-            </div>
-            <div className={`mt-3 rounded-xl px-3 py-3 ${over ? "bg-chile text-ink" : "bg-paper-2"}`} aria-live="polite">
-              <div className="grid grid-cols-2 gap-2">
-                <Stat label="Recipe cost" value={row?.menuCost == null ? "—" : moneyExact(row.menuCost)} />
-                <Stat label="Food cost" value={row?.foodCostPct == null ? "—" : pct(row.foodCostPct)} tone={over ? "text-warn" : "text-sage"} />
-                <Stat label="Gross profit" value={row?.grossProfit == null ? "—" : moneyExact(row.grossProfit)} />
-                <Stat
-                  label={`Suggest @ ${targetLabel}`}
-                  value={row?.suggestedPrice == null ? "—" : moneyExact(row.suggestedPrice)}
-                  emphasis
-                />
-              </div>
-            </div>
-          </article>
-        );
-      })}
+      <h4 className="px-1 text-sm font-semibold">Menu food cost</h4>
+      {costedMenu.map((item) => (
+        <MenuPriceCard
+          key={item.id}
+          item={item}
+          location={location}
+          draft={draft}
+          parsed={parsed}
+          report={report}
+          targetLabel={targetLabel}
+          onPrice={onPrice}
+        />
+      ))}
+
+      {openMenu.length > 0 ? (
+        <div className="space-y-3" data-section="workbook-open-recipes">
+          <div className="px-1">
+            <h4 className="text-sm font-semibold">Named on the sheet, no recipe yet</h4>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              These names are in the workbook. The recipe rows have an empty ingredient cell, and Menu Summary
+              has no typed sell price. A formula that returns $0 is not a price, so food cost stays blank.
+            </p>
+          </div>
+          {openMenu.map((item) => (
+            <MenuPriceCard
+              key={item.id}
+              item={item}
+              location={location}
+              draft={draft}
+              parsed={parsed}
+              report={report}
+              targetLabel={targetLabel}
+              onPrice={onPrice}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {report.plates.length > 0 ? (
         <div className="rounded-2xl border border-line bg-card p-4">
@@ -478,6 +475,95 @@ function KitchenSimulator({
       </p>
       {location.caveat ? <p className="px-1 text-xs text-muted">{location.caveat}</p> : null}
     </section>
+  );
+}
+
+function MenuPriceCard({
+  item,
+  location,
+  draft,
+  parsed,
+  report,
+  targetLabel,
+  onPrice,
+}: {
+  item: SimulatorItem;
+  location: SimulatorLocation;
+  draft: LocationDraft;
+  parsed: ParsedDraft;
+  report: ReturnType<typeof buildFoodCostReport>;
+  targetLabel: string;
+  onPrice: (sourceKey: string, value: string) => void;
+}) {
+  const row = report.menu.find((entry) => entry.sourceKey === item.sourceKey);
+  const priceInvalid = parsed.invalidKeys.includes(`price:${item.sourceKey}`);
+  const livePrice = parsed.prices.get(item.sourceKey);
+  const priceDirty = livePrice !== undefined && moneyDiffer(livePrice ?? null, item.price);
+  const over = row?.foodCostPct != null && row.foodCostPct > location.targetFoodCostPct;
+  return (
+    <article
+      data-menu-item={item.name}
+      data-costed={item.lines.length > 0 ? "true" : "false"}
+      className="rounded-2xl border border-line bg-card p-4"
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">{item.category}</p>
+      <h5 className="font-display text-lg font-extrabold leading-tight">{item.name}</h5>
+      <div className="mt-3">
+        <MoneyField
+          id={`${location.locationId}-price-${item.sourceKey}`}
+          label={`${item.name} selling price`}
+          caption="Selling price"
+          value={draft.prices[item.sourceKey] ?? ""}
+          invalid={priceInvalid}
+          dirty={priceDirty}
+          onChange={(value) => onPrice(item.sourceKey, value)}
+        />
+        {priceDirty ? (
+          <p className="mt-1 text-xs text-muted">Saved sell {item.price == null ? "blank" : moneyExact(item.price)}</p>
+        ) : null}
+      </div>
+      <div className={`mt-3 rounded-xl px-3 py-3 ${over ? "bg-chile text-ink" : "bg-paper-2"}`} aria-live="polite">
+        <div className="grid grid-cols-2 gap-2">
+          <Stat label="Recipe cost" value={row?.menuCost == null ? "—" : moneyExact(row.menuCost)} />
+          <Stat
+            label="Food cost"
+            value={row?.foodCostPct == null ? "—" : pct(row.foodCostPct)}
+            tone={over ? "text-warn" : "text-sage"}
+          />
+          <Stat label="Gross profit" value={row?.grossProfit == null ? "—" : moneyExact(row.grossProfit)} />
+          <Stat
+            label={`Suggest @ ${targetLabel}`}
+            value={row?.suggestedPrice == null ? "—" : moneyExact(row.suggestedPrice)}
+            emphasis
+          />
+        </div>
+      </div>
+      {row && row.lines.length > 0 ? (
+        <ul className="mt-3 divide-y divide-line">
+          {row.lines.map((line) => (
+            <li
+              key={`${line.name}-${line.kind}-${line.quantity}`}
+              className="flex items-start justify-between gap-3 py-2 text-sm"
+            >
+              <span>
+                {line.name}
+                <span className="ml-1 text-xs text-muted">
+                  {qtyLabel(line.quantity)} {line.unit}
+                </span>
+                {line.notes ? <span className="mt-0.5 block text-xs text-muted">{line.notes}</span> : null}
+              </span>
+              <span className="tabular shrink-0 text-xs font-semibold">
+                {line.menuCost == null ? "—" : moneyExact(line.menuCost)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-xs leading-5 text-muted">
+          No ingredient on this recipe row, and no typed sell price. Food cost % stays blank.
+        </p>
+      )}
+    </article>
   );
 }
 

@@ -168,11 +168,29 @@ test("a unit-cost what-if stays on one copy of the workbook", () => {
   assert.equal(asada.name, "Carne Asada");
 });
 
-test("empty template items stay unpriced", () => {
-  for (const name of ["Torta de Chilaquiles", "Keto Chilaquiles", "Breakfast Burrito", "Chorizo & Egg Burrito", "Breakfast Bowl"]) {
+test("empty template items stay in the menu and stay unpriced", () => {
+  const open = [
+    "Torta de Chilaquiles",
+    "Keto Chilaquiles",
+    "Breakfast Burrito",
+    "Chorizo & Egg Burrito",
+    "Breakfast Bowl",
+  ];
+  const names = workbook.menuItems.map((row) => row.name);
+  for (const name of open) {
+    assert.ok(names.includes(name), name);
+    const source = workbook.menuItems.find((row) => row.name === name);
+    assert.equal(source?.lines.length, 0);
     const row = item(name);
     assert.equal(row.price, null);
     assert.equal(row.menuCost, null);
     assert.equal(row.costed, false);
+    assert.equal(row.lines.length, 0);
   }
+  const costed = report.menu.filter((row) => row.costed).map((row) => row.name);
+  assert.deepEqual(costed, [
+    "Build Your Own Chilaquiles",
+    "Burrito de Chilaquiles",
+    "OG Breakfast Burrito",
+  ]);
 });
