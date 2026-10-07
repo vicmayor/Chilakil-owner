@@ -2,7 +2,7 @@ import { SyncHoursButton } from "@/components/sync-hours-button";
 import { TopBar } from "@/components/top-bar";
 import { Card, LocationDot, Metric } from "@/components/ui";
 import { formatPhoenixDateTime, formatShortDate, formatTime } from "@/lib/dates";
-import type { EmployeeHoursView, LocationHoursBlock } from "@/lib/employee-hours";
+import { unpaidBreakNote, type EmployeeHoursView, type LocationHoursBlock } from "@/lib/employee-hours";
 import { moneyExact, pct } from "@/lib/format";
 import type { LocationScope } from "@/lib/location";
 
@@ -29,7 +29,8 @@ export function EmployeeHoursScreen({
           <Card>
             <p className="text-base font-medium">Not connected</p>
             <p className="mt-1 text-sm text-muted">
-              Set CHILAKIL_TEAM_API_URL and CHILAKIL_TEAM_API_TOKEN to pull hours from the team site.
+              Set CHILAKIL_TEAM_API_KEY to pull hours from the team site. The base URL defaults to
+              https://team.chilakiltogo.com.
             </p>
           </Card>
         )}
@@ -40,6 +41,7 @@ export function EmployeeHoursScreen({
               ? "No pay periods synced yet"
               : "No hours on file"}
         </p>
+        {view.lastError ? <p className="text-sm text-danger">{view.lastError}</p> : null}
 
         {view.periods.length === 0 ? (
           connected ? (
@@ -58,6 +60,10 @@ export function EmployeeHoursScreen({
                   Pay period {formatPayPeriod(period.periodStart, period.periodEnd)}
                 </h2>
                 <p className="text-xs text-muted">Sunday–Saturday · each location is listed on its own.</p>
+                <div className="mt-2">
+                  <ReviewBadge pending={period.status === "pending"} />
+                  <p className="mt-1 text-xs text-muted">This approval covers both locations.</p>
+                </div>
               </div>
               {period.locations.map((block) => (
                 <LocationBlock key={block.locationId} block={block} />
@@ -73,15 +79,7 @@ export function EmployeeHoursScreen({
 function LocationBlock({ block }: { block: LocationHoursBlock }) {
   return (
     <Card>
-      <div className="flex items-center justify-between gap-2">
-        <LocationDot id={block.locationId} />
-        <ReviewBadge review={block.review} />
-      </div>
-      {block.review === "mixed" ? (
-        <p className="mt-2 text-xs text-muted">
-          {block.pendingCount} pending review · {block.approvedCount} approved
-        </p>
-      ) : null}
+      <LocationDot id={block.locationId} />
       <div className="mt-3 grid grid-cols-2 gap-4">
         <Metric label="Hours" value={formatHourCount(block.hours)} hint="hours" />
         <Metric
@@ -104,29 +102,62 @@ function LocationBlock({ block }: { block: LocationHoursBlock }) {
               <div>
                 <p className="text-sm font-medium">{employee.employeeName}</p>
                 <p className="text-xs text-muted">
-                  {formatHourCount(employee.hours)} hrs · {moneyExact(employee.hourlyRate)}/hr ·{" "}
-                  {employee.status === "approved" ? "Approved" : "Pending review"}
+                  {formatHourCount(employee.hours)} hrs · current rate {moneyExact(employee.hourlyRate)}/hr
                 </p>
+                <p className="text-xs text-muted">Rates applied {formatRates(employee.appliedHourlyRates)}</p>
               </div>
               <p className="tabular text-sm font-semibold">{moneyExact(employee.grossPayEstimate)}</p>
             </div>
-            {employee.days.length > 0 ? (
+            {employee.segments.length > 0 || employee.openShifts.length > 0 ? (
               <details className="mt-1">
                 <summary className="cursor-pointer text-xs font-semibold text-muted">Punches</summary>
-                <ul className="mt-1 space-y-1">
-                  {employee.days.map((day) => (
+                <ul className="mt-1 space-y-2">
+                  {employee.dateHours.map((day) => (
                     <li key={day.date} className="text-xs text-muted">
                       <span className="font-medium text-ink">{formatShortDate(day.date)}</span>
                       {" · "}
-                      {formatPunch(day.clockIn)}–{formatPunch(day.clockOut)}
-                      {" · "}
                       {formatHourCount(day.hours)} hrs
-                      {day.breaks.length > 0
-                        ? ` · Break ${day.breaks.map((brk) => `${formatPunch(brk.start)}–${formatPunch(brk.end)}`).join(", ")}`
-                        : ""}
+                    </li>
+                  ))}
+                  {employee.segments.map((segment) => (
+                    <li key={`${segment.shiftId}|${segment.date}`} className="text-xs text-muted">
+                      {segment.open ? (
+                        <>
+                          <span className="font-medium text-ink">Open shift</span>
+                          {" · "}
+                          {formatShortDate(segment.date)}
+                          {" · "}
+                          {formatPunch(segment.clockIn)}
+                          {" · not counted"}
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium text-ink">{formatShortDate(segment.date)}</span>
+                          {" · "}
+                          {formatPunch(segment.clockIn)}–{formatPunch(segment.clockOut)}
+                          {" · "}
+                          {formatHourCount(segment.hours)} hrs
+                          {segment.breaks.length > 0
+                            ? ` · Break ${segment.breaks.map((brk) => `${formatPunch(brk.start)}–${formatPunch(brk.end)}`).join(", ")}`
+                            : ""}
+                        </>
+                      )}
+                      {unpaidBreakNote(segment) ? <span className="block">{unpaidBreakNote(segment)}</span> : null}
                     </li>
                   ))}
                 </ul>
+                {employee.openShifts.length > 0 ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold text-ink">Open shifts</p>
+                    <ul className="mt-1 space-y-1">
+                      {employee.openShifts.map((shift) => (
+                        <li key={shift.shiftId} className="text-xs text-muted">
+                          {shift.shiftId} · clock in {formatPunch(shift.clockIn)} · not counted
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </details>
             ) : null}
           </li>
@@ -136,8 +167,7 @@ function LocationBlock({ block }: { block: LocationHoursBlock }) {
   );
 }
 
-function ReviewBadge({ review }: { review: LocationHoursBlock["review"] }) {
-  const pending = review !== "approved";
+function ReviewBadge({ pending }: { pending: boolean }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
@@ -161,7 +191,12 @@ function squareSalesHint(block: LocationHoursBlock): string {
 }
 
 function formatHourCount(hours: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(hours);
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(hours);
+}
+
+function formatRates(rates: number[]): string {
+  if (rates.length === 0) return "—";
+  return rates.map((rate) => moneyExact(rate)).join(", ");
 }
 
 function formatPunch(value: string | null): string {

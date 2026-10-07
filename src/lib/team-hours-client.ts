@@ -11,9 +11,12 @@ export type TeamHoursClient = {
 
 type TeamHoursEnv = {
   CHILAKIL_TEAM_API_URL?: string;
+  CHILAKIL_TEAM_API_KEY?: string;
   CHILAKIL_TEAM_API_TOKEN?: string;
   [key: string]: string | undefined;
 };
+
+export const TEAM_HOURS_DEFAULT_BASE_URL = "https://team.chilakiltogo.com";
 
 export class TeamHoursApiError extends Error {
   readonly status: number;
@@ -25,21 +28,22 @@ export class TeamHoursApiError extends Error {
   }
 }
 
-/** Both env vars must be set or the Employees page stays "Not connected". */
+/** A key or legacy token must be set. The base URL defaults to the Team site. */
 export function teamHoursConfigured(env: TeamHoursEnv = process.env): boolean {
   return createTeamHoursClient(env) != null;
 }
 
 /**
  * Read-only client for GET {base}/api/v1/hours.
- * The path and query names are isolated here so the endpoint can change later.
+ * The path, query names, and key header live here so the endpoint can change later.
+ * The key is sent only as Authorization: Bearer. It is never placed in the URL.
  */
 export function createTeamHoursClient(
   env: TeamHoursEnv = process.env,
   fetchImpl: typeof fetch = fetch,
 ): TeamHoursClient | null {
-  const baseUrl = normalizeBaseUrl(env.CHILAKIL_TEAM_API_URL);
-  const token = env.CHILAKIL_TEAM_API_TOKEN?.trim();
+  const baseUrl = resolveBaseUrl(env.CHILAKIL_TEAM_API_URL);
+  const token = teamApiKey(env);
   if (!baseUrl || !token) return null;
 
   return {
@@ -62,12 +66,23 @@ export function createTeamHoursClient(
   };
 }
 
-function normalizeBaseUrl(value: string | undefined): string | null {
+function teamApiKey(env: TeamHoursEnv): string | null {
+  const key = env.CHILAKIL_TEAM_API_KEY?.trim();
+  if (key) return key;
+  const token = env.CHILAKIL_TEAM_API_TOKEN?.trim();
+  return token || null;
+}
+
+function resolveBaseUrl(value: string | undefined): string | null {
   const trimmed = value?.trim();
-  if (!trimmed) return null;
+  if (!trimmed) return TEAM_HOURS_DEFAULT_BASE_URL;
+  return normalizeBaseUrl(trimmed);
+}
+
+function normalizeBaseUrl(value: string): string | null {
   let url: URL;
   try {
-    url = new URL(trimmed);
+    url = new URL(value);
   } catch {
     return null;
   }

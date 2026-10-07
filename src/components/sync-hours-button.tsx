@@ -19,7 +19,8 @@ export function SyncHoursButton() {
         return;
       }
       if (!result.ok) {
-        setMessage("Couldn't sync hours.");
+        setMessage(result.error ?? "Couldn't sync hours.");
+        router.refresh();
         return;
       }
       setMessage("Synced");

@@ -303,39 +303,79 @@ enum EmployeeHoursStatus {
 /// Pulled from the Chilakil Team API. Keyed by employee id, so the same
 /// person can have a row at Glendale and a row at Avondale.
 /// Dates are America/Phoenix calendar days. This app does not edit or approve these rows.
+/// status is the Team period approval, which covers both locations.
+/// grossPayEstimate is stored as Team sent it. hourlyRate is the current rate only.
 model EmployeeHoursPeriod {
-  id               String              @id @default(cuid())
-  locationId       String
-  location         Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  periodStart      String
-  periodEnd        String
-  employeeId       String
-  employeeName     String
-  hourlyRate       Decimal             @db.Decimal(10, 2)
-  totalHours       Decimal             @db.Decimal(10, 2)
-  grossPayEstimate Decimal             @db.Decimal(10, 2)
-  status           EmployeeHoursStatus
-  syncedAt         DateTime            @default(now())
-  days             EmployeeHoursDay[]
+  id                 String                     @id @default(cuid())
+  locationId         String
+  location           Location                   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  periodStart        String
+  periodEnd          String
+  employeeId         String
+  employeeName       String
+  hourlyRate         Decimal                    @db.Decimal(10, 2)
+  totalHours         Decimal                    @db.Decimal(14, 6)
+  grossPayEstimate   Decimal                    @db.Decimal(10, 2)
+  status             EmployeeHoursStatus
+  syncedAt           DateTime                   @default(now())
+  days               EmployeeHoursDay[]
+  appliedHourlyRates EmployeeHoursAppliedRate[]
+  openShifts         EmployeeHoursOpenShift[]
 
   @@unique([locationId, periodStart, employeeId])
   @@index([locationId, periodStart])
 }
 
-/// One day's punches for an employee hours period. clockIn and clockOut stay
-/// as the team API sent them.
+/// One shift segment on one date. A night shift can share shiftId across dates.
+/// Several segments can share a date. Hours keep up to six decimals.
+/// unpaidBreakMinutes is already deducted from hours.
 model EmployeeHoursDay {
+  id                  String               @id @default(cuid())
+  periodId            String
+  period              EmployeeHoursPeriod  @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  shiftId             String
+  date                String
+  clockIn             String?
+  clockOut            String?
+  hours               Decimal              @db.Decimal(14, 6)
+  hourlyRate          Decimal              @db.Decimal(10, 2)
+  unpaidBreakMinutes  Int
+  breakTimesRecorded  Boolean
+  breaks              EmployeeHoursBreak[]
+
+  @@unique([periodId, shiftId, date])
+  @@index([periodId, date])
+}
+
+/// Historical rates Team used for grossPayEstimate. Not the current rate.
+model EmployeeHoursAppliedRate {
+  id         String              @id @default(cuid())
+  periodId   String
+  period     EmployeeHoursPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  hourlyRate Decimal             @db.Decimal(10, 2)
+  sortOrder  Int                 @default(0)
+
+  @@index([periodId, sortOrder])
+}
+
+/// Open shift listed by Team, including a clock-in from before this week.
+/// Hours stay on the segment as 0 and are not counted.
+model EmployeeHoursOpenShift {
   id       String              @id @default(cuid())
   periodId String
   period   EmployeeHoursPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  date     String
-  clockIn  String?
-  clockOut String?
-  hours    Decimal             @db.Decimal(10, 2)
-  breaks   EmployeeHoursBreak[]
+  shiftId  String
+  clockIn  String
 
-  @@unique([periodId, date])
-  @@index([periodId, date])
+  @@unique([periodId, shiftId])
+}
+
+/// Last Team hours sync. A failed pull leaves lastSuccessAt and the hour rows in place.
+model TeamHoursSyncState {
+  id            String    @id
+  lastSuccessAt DateTime?
+  lastError     String?
+  lastErrorAt   DateTime?
 }
 
 model EmployeeHoursBreak {

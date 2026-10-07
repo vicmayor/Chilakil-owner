@@ -119,13 +119,15 @@ Example files live in `examples/`. `source` cannot be `sample` on these endpoint
 
 ## Employee hours
 
-The Employees screen pulls Sunday–Saturday pay periods from the Chilakil Team API. It does not edit or approve hours. Set both `CHILAKIL_TEAM_API_URL` and `CHILAKIL_TEAM_API_TOKEN`. If either is missing, the screen says **Not connected** and Sync now is hidden.
+The Employees screen pulls Sunday–Saturday pay periods from the Chilakil Team API. It does not edit or approve hours. Set `CHILAKIL_TEAM_API_KEY`. The base URL defaults to `https://team.chilakiltogo.com`; set `CHILAKIL_TEAM_API_URL` only to point somewhere else. `CHILAKIL_TEAM_API_TOKEN` is used only when the key is unset. If neither secret is set, the screen says **Not connected** and Sync now is hidden.
 
 Sync now, and `GET` or `POST /api/sync/employee-hours`, read:
 
-`GET {CHILAKIL_TEAM_API_URL}/api/v1/hours?periodStart=YYYY-MM-DD&location=glendale|avondale|all`
+`GET {base}/api/v1/hours?periodStart=YYYY-MM-DD&location=glendale|avondale|all`
 
-with `Authorization: Bearer $CHILAKIL_TEAM_API_TOKEN`. The sync asks for `location=all` for the current Phoenix week and the previous seven weeks. `periodStart` is the Sunday. Rows are stored per employee id, location, and period, with each day’s clock in, clock out, and breaks. Those times are either `HH:MM` or an ISO timestamp with an offset, such as `2026-10-04T07:58:00-07:00`, and are stored as sent. The same employee id may have a row at both locations. ALL shows those locations as separate labeled blocks. Labor % is that location’s gross pay estimate divided by its Square gross for the same dates. The estimate excludes overtime, tips, and taxes.
+with `Authorization: Bearer $CHILAKIL_TEAM_API_KEY`. The key is not put in the URL. The sync asks for `location=all` for the current Phoenix week and the previous seven weeks. `periodStart` must be a Sunday. A successful response replaces that week’s rows for the requested location. `401`, `400`, `503`, and network errors leave the last stored week in place, record the error, and keep the last successful sync time.
+
+Rows are stored per employee id, location, and period. Each day can contain several shift segments, keyed by `shiftId` and date. Hours keep up to six decimals. `unpaidBreakMinutes` is already deducted from `hours`. An empty `breaks` array with `breakTimesRecorded: false` is not “no break”. Open shifts have `clockOut: null` and `hours: 0`; they are listed and not counted. `grossPayEstimate` and `appliedHourlyRates` are stored as Team sent them. Approval status is for the whole period and covers both locations. The same employee id may have a row at both locations. ALL shows those locations as separate labeled blocks. Labor % is that location’s gross pay estimate divided by its Square gross for the same dates. The estimate excludes overtime, tips, and taxes.
 
 The sync route is for cron. It accepts `Authorization: Bearer $CRON_SECRET` or `Authorization: Bearer $INGEST_TOKEN`. It does not use the team token as its own password.
 
@@ -188,7 +190,7 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `FoodCostProfile` — per-location workbook target (30%) and costing caveat
 - `CustomerMessage` — `language` `en|es`, sensitivity flags, draft/approved reply
 - `Review`, `MarketingCampaign`, `Employee`, `Shift`
-- `EmployeeHoursPeriod`, `EmployeeHoursDay`, `EmployeeHoursBreak` — one employee’s Sunday–Saturday hours for one location, keyed by employee id, with daily punches and breaks. Status is `pending` or `approved`. Read-only in this app.
+- `EmployeeHoursPeriod`, `EmployeeHoursDay`, `EmployeeHoursBreak`, `EmployeeHoursAppliedRate`, `EmployeeHoursOpenShift`, `TeamHoursSyncState` — one employee’s Sunday–Saturday hours for one location, keyed by employee id, with shift segments, unpaid break minutes, applied rates, and open shifts. Period status covers both locations. Read-only in this app.
 - `IntegrationConfig` — `secretRef` env var name only
 - `Alert`, `AiThread`, `AiMessage`, `User`
 
@@ -207,7 +209,7 @@ Today’s seeded shape (Phoenix “today”, not a fixed calendar date):
 
 ## Env vars
 
-See `.env.example`. Required: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `INGEST_TOKEN`, `OWNER_EMAIL`, `OWNER_PASSWORD`. Optional: `OPENAI_API_KEY`, `APP_URL`, `OWNER_NAME`, `SEED_SAMPLE`, `CRON_SECRET`, `CHILAKIL_TEAM_API_URL`, `CHILAKIL_TEAM_API_TOKEN`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
+See `.env.example`. Required: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `INGEST_TOKEN`, `OWNER_EMAIL`, `OWNER_PASSWORD`. Optional: `OPENAI_API_KEY`, `APP_URL`, `OWNER_NAME`, `SEED_SAMPLE`, `CRON_SECRET`, `CHILAKIL_TEAM_API_URL`, `CHILAKIL_TEAM_API_KEY`, `CHILAKIL_TEAM_API_TOKEN`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
 
 `DailySales` is still the channel-level sample mix. Imported days live in `DailySalesRecord` (unique on location + Phoenix date). DoorDash merchant weeks live in `DoorDashWeeklyReport` and Uber Eats merchant weeks live in `UberEatsWeeklyReport` (each unique on location + week start). The dashboard uses `DailySalesRecord` for today when a row exists.
 

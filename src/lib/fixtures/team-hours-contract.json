@@ -1,0 +1,31 @@
+{
+  "periodStart": "2026-10-04",
+  "periodEnd": "2026-10-10",
+  "timezone": "America/Phoenix",
+  "employees": [
+    {
+      "employeeId": "empleado-ejemplo",
+      "name": "Empleado de ejemplo",
+      "location": "glendale",
+      "hourlyRate": 17,
+      "status": "pending",
+      "totalHours": 5.5,
+      "grossPayEstimate": 93.5,
+      "days": [
+        {
+          "date": "2026-10-07",
+          "shiftId": "turno-ejemplo",
+          "clockIn": "2026-10-07T08:00:00-07:00",
+          "clockOut": "2026-10-07T14:00:00-07:00",
+          "breaks": [],
+          "unpaidBreakMinutes": 30,
+          "breakTimesRecorded": false,
+          "hourlyRate": 17,
+          "hours": 5.5
+        }
+      ],
+      "appliedHourlyRates": [17],
+      "openShifts": []
+    }
+  ]
+}

@@ -11,19 +11,29 @@
       "status": "pending",
       "totalHours": 12.5,
       "grossPayEstimate": 225,
+      "appliedHourlyRates": [18],
+      "openShifts": [],
       "days": [
         {
           "date": "2026-09-27",
+          "shiftId": "shift-maria-g1",
           "clockIn": "08:00",
           "clockOut": "16:30",
           "breaks": [{ "start": "12:00", "end": "12:30" }],
+          "unpaidBreakMinutes": 30,
+          "breakTimesRecorded": true,
+          "hourlyRate": 18,
           "hours": 8
         },
         {
           "date": "2026-09-28",
+          "shiftId": "shift-maria-g2",
           "clockIn": "09:00",
           "clockOut": null,
           "breaks": [],
+          "unpaidBreakMinutes": 0,
+          "breakTimesRecorded": true,
+          "hourlyRate": 18,
           "hours": 4.5
         }
       ]
@@ -36,12 +46,18 @@
       "status": "approved",
       "totalHours": 6,
       "grossPayEstimate": 108,
+      "appliedHourlyRates": [18],
+      "openShifts": [],
       "days": [
         {
           "date": "2026-09-27",
+          "shiftId": "shift-maria-a1",
           "clockIn": "10:00",
           "clockOut": "16:00",
           "breaks": [{ "start": "13:00", "end": "13:15" }, { "start": "15:00", "end": "15:10" }],
+          "unpaidBreakMinutes": 25,
+          "breakTimesRecorded": true,
+          "hourlyRate": 18,
           "hours": 6
         }
       ]
@@ -54,12 +70,18 @@
       "status": "approved",
       "totalHours": 4,
       "grossPayEstimate": 68,
+      "appliedHourlyRates": [17],
+      "openShifts": [],
       "days": [
         {
           "date": "2026-10-03",
+          "shiftId": "shift-luis-g1",
           "clockIn": "11:00",
           "clockOut": "15:00",
           "breaks": [],
+          "unpaidBreakMinutes": 0,
+          "breakTimesRecorded": true,
+          "hourlyRate": 17,
           "hours": 4
         }
       ]
