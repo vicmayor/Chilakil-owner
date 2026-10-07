@@ -107,15 +107,42 @@ Leave `SEED_SAMPLE` unset for that command. It upserts the two locations and the
 
 ## Import daily sales and delivery weeks
 
-`POST /api/ingest/daily-sales`, `POST /api/ingest/doordash-weekly`, and `POST /api/ingest/ubereats-weekly` require `Authorization: Bearer $INGEST_TOKEN`. Each accepts one JSON object, a JSON array, or `{ "records": [ ... ] }`. CSV is accepted when `Content-Type` is `text/csv`. Unknown locations are rejected. A store id must match the location or the whole request is rejected and nothing is written. DoorDash stores are `32669627` Glendale and `27859030` Avondale. Uber Eats stores are `91bb8a8e-e9c5-5c0d-88a0-671cb75faf20` Glendale and `a4232345-3850-5bb6-92bf-27434a445d64` Avondale (Uber may label that store Phoenix). `weekEnd` must be six days after `weekStart`. Re-posting the same location and date (or location and week start) updates that row. Uber Eats fee fields keep the statement sign, and `errorCharges` may be null.
+`POST /api/ingest/daily-sales`, `POST /api/ingest/doordash-weekly`, `POST /api/ingest/ubereats-weekly`, and `POST /api/ingest/employee-hours` require `Authorization: Bearer $INGEST_TOKEN`. Each accepts one JSON object, a JSON array, or `{ "records": [ ... ] }`. CSV is accepted when `Content-Type` is `text/csv`. Unknown locations are rejected. A store id must match the location or the whole request is rejected and nothing is written. DoorDash stores are `32669627` Glendale and `27859030` Avondale. Uber Eats stores are `91bb8a8e-e9c5-5c0d-88a0-671cb75faf20` Glendale and `a4232345-3850-5bb6-92bf-27434a445d64` Avondale (Uber may label that store Phoenix). `weekEnd` must be six days after `weekStart`. Re-posting the same location and date (or location and week start) updates that row. Uber Eats fee fields keep the statement sign, and `errorCharges` may be null.
 
 ```bash
 npm run ingest -- daily-sales examples/daily-sales.json
 npm run ingest -- doordash-weekly examples/doordash-weekly.csv
 npm run ingest -- ubereats-weekly examples/ubereats-weekly.json
+npm run ingest -- employee-hours examples/employee-hours.json
 ```
 
 Example files live in `examples/`. `source` cannot be `sample` on these endpoints; that value is only for the local demo seed.
+
+### Employee hours payload
+
+`POST /api/ingest/employee-hours` upserts one employee at one location for one pay period. The same person may have a row at both locations. The unique key is `location` + `periodStart` + `employeeName`. `hours`, `hourlyRate`, and `basePay` are non-negative numbers (stored as decimals, rounded to cents). `periodEnd` must be on or after `periodStart`. Dates are `YYYY-MM-DD`. `status` is `pending` or `approved`. `GLENDALE` / `AVONDALE` and `pending review` are accepted and stored as `glendale` / `avondale` and `pending`. The server sets `syncedAt`. Re-posting the same key updates hours, rate, base pay, period end, status, and source.
+
+Exact JSON shape:
+
+```json
+{
+  "records": [
+    {
+      "location": "glendale",
+      "periodStart": "2026-09-22",
+      "periodEnd": "2026-10-05",
+      "employeeName": "Maria Lopez",
+      "hours": 72.5,
+      "hourlyRate": 18,
+      "basePay": 1305,
+      "status": "pending",
+      "source": "team-chilakiltogo-pay-periods"
+    }
+  ]
+}
+```
+
+`location` is `"glendale"` or `"avondale"`. A single object or a bare array is also accepted, same as the other ingest routes. The Employees screen shows each pay period as labeled per-location blocks. ALL does not add the stores together. Labor % is that location’s base pay divided by its Square gross (`DailySalesRecord.grossSales`) on the dates from `periodStart` through `periodEnd`. Base pay excludes overtime, tips, and taxes.
 
 ## Food cost workbook
 
@@ -143,7 +170,7 @@ Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid
 9. Customer Messages — EN/ES chrome; sensitive types require owner Approve / Edit / Reject
 10. Reviews
 11. Marketing
-12. Employees
+12. Employees — pay-period hours, base pay, and labor % of that location’s Square sales
 13. AI Assistant — queries seeded data; respects the location filter
 
 ## Customer messages (approval gate)
@@ -172,6 +199,7 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `FoodCostProfile` — per-location workbook target (30%) and costing caveat
 - `CustomerMessage` — `language` `en|es`, sensitivity flags, draft/approved reply
 - `Review`, `MarketingCampaign`, `Employee`, `Shift`
+- `EmployeeHoursPeriod` — one employee’s hours for one location and pay period (unique on location + period start + employee name). Status is `pending` or `approved`.
 - `IntegrationConfig` — `secretRef` env var name only
 - `Alert`, `AiThread`, `AiMessage`, `User`
 

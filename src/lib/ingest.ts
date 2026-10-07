@@ -105,6 +105,34 @@ export const uberEatsWeeklyRecordSchema = z.object({
   source: z.string().trim().min(1).max(80),
 });
 
+const ingestLocation = z
+  .string()
+  .trim()
+  .transform((value) => value.toLowerCase())
+  .pipe(z.enum(["glendale", "avondale"]));
+
+const employeeHoursStatus = z
+  .string()
+  .trim()
+  .transform((value) => value.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " "))
+  .transform((value) => (value === "pending review" ? "pending" : value))
+  .pipe(z.enum(["pending", "approved"]));
+
+/** Decimal(10, 2) column limit: 99,999,999.99 */
+const payrollAmount = z.number().finite().nonnegative().max(99_999_999.99);
+
+export const employeeHoursRecordSchema = z.object({
+  location: ingestLocation,
+  periodStart: isoDate,
+  periodEnd: isoDate,
+  employeeName: z.string().trim().min(1).max(120),
+  hours: payrollAmount,
+  hourlyRate: payrollAmount,
+  basePay: payrollAmount,
+  status: employeeHoursStatus,
+  source: z.string().trim().min(1).max(80),
+});
+
 export const DAILY_SALES_NUMERIC_COLUMNS = new Set([
   "grossSales",
   "netSales",
@@ -157,6 +185,8 @@ export const UBEREATS_WEEKLY_NUMERIC_COLUMNS = new Set([
   "errorCharges",
   "netPayout",
 ]);
+
+export const EMPLOYEE_HOURS_NUMERIC_COLUMNS = new Set(["hours", "hourlyRate", "basePay"]);
 
 export type NormalizedDailySale = {
   locationId: LocationId;
@@ -218,6 +248,20 @@ export type NormalizedUberEatsWeek = {
   adjustments: number;
   errorCharges: number | null;
   netPayout: number;
+  source: string;
+};
+
+export type EmployeeHoursStatus = "pending" | "approved";
+
+export type NormalizedEmployeeHours = {
+  locationId: LocationId;
+  periodStart: string;
+  periodEnd: string;
+  employeeName: string;
+  hours: number;
+  hourlyRate: number;
+  basePay: number;
+  status: EmployeeHoursStatus;
   source: string;
 };
 
@@ -329,6 +373,52 @@ export function parseUberEatsWeeklyBody(input: unknown): ParseResult<NormalizedU
   return { ok: true, records };
 }
 
+export function parseEmployeeHoursBody(input: unknown): ParseResult<NormalizedEmployeeHours> {
+  const unwrapped = unwrapRecords(input);
+  if (!unwrapped.ok) return unwrapped;
+  const records: NormalizedEmployeeHours[] = [];
+  const issues: string[] = [];
+  unwrapped.records.forEach((raw, index) => {
+    const parsed = employeeHoursRecordSchema.safeParse(raw);
+    if (!parsed.success) {
+      issues.push(`Record ${index + 1}: ${formatZod(parsed.error)}`);
+      return;
+    }
+    const reserved = reservedSource(parsed.data.source, index);
+    if (reserved) {
+      issues.push(reserved);
+      return;
+    }
+    if (parsed.data.periodEnd < parsed.data.periodStart) {
+      issues.push(`Record ${index + 1}: periodEnd must be on or after periodStart.`);
+      return;
+    }
+    records.push({
+      locationId: parsed.data.location,
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+      employeeName: parsed.data.employeeName,
+      hours: round2(parsed.data.hours),
+      hourlyRate: round2(parsed.data.hourlyRate),
+      basePay: round2(parsed.data.basePay),
+      status: parsed.data.status,
+      source: parsed.data.source,
+    });
+  });
+  if (issues.length) return { ok: false, error: "Invalid employee hours payload", issues };
+  const duplicate = duplicateKey(
+    records.map((record) => `${record.locationId}|${record.periodStart}|${record.employeeName}`),
+  );
+  if (duplicate) {
+    return {
+      ok: false,
+      error: "Duplicate location, period start, and employee in batch",
+      issues: [duplicate],
+    };
+  }
+  return { ok: true, records };
+}
+
 export async function upsertDailySales(records: NormalizedDailySale[]) {
   const importedAt = new Date();
   return prisma.$transaction(
@@ -357,6 +447,25 @@ export async function upsertDoorDashWeekly(records: NormalizedWeeklyReport[]) {
         },
         create: { ...record, importedAt },
         update: { ...record, importedAt },
+      }),
+    ),
+  );
+}
+
+export async function upsertEmployeeHours(records: NormalizedEmployeeHours[]) {
+  const syncedAt = new Date();
+  return prisma.$transaction(
+    records.map((record) =>
+      prisma.employeeHoursPeriod.upsert({
+        where: {
+          locationId_periodStart_employeeName: {
+            locationId: record.locationId,
+            periodStart: record.periodStart,
+            employeeName: record.employeeName,
+          },
+        },
+        create: { ...record, syncedAt },
+        update: { ...record, syncedAt },
       }),
     ),
   );
@@ -558,7 +667,7 @@ function reservedSource(source: string, index: number): string | null {
 function duplicateKey(keys: string[]): string | null {
   const seen = new Set<string>();
   for (const key of keys) {
-    if (seen.has(key)) return `Duplicate key ${key.replace("|", " / ")} in the same batch.`;
+    if (seen.has(key)) return `Duplicate key ${key.replaceAll("|", " / ")} in the same batch.`;
     seen.add(key);
   }
   return null;

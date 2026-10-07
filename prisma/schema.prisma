@@ -43,8 +43,9 @@ model Location {
   messages           CustomerMessage[]
   reviews            Review[]
   campaigns          MarketingCampaign[]
-  employees          Employee[]
-  shifts             Shift[]
+  employees             Employee[]
+  shifts                Shift[]
+  employeeHoursPeriods  EmployeeHoursPeriod[]
   integrations          IntegrationConfig[]
   alerts                Alert[]
   dailySalesRecords     DailySalesRecord[]
@@ -291,6 +292,34 @@ model Shift {
   hours      Float
   laborCost  Float
   role       String
+}
+
+enum EmployeeHoursStatus {
+  pending
+  approved
+}
+
+/// One employee for one location and one pay period.
+/// Dates are America/Phoenix calendar days (YYYY-MM-DD).
+/// Unique on location + period start + employee name, so the same person
+/// can have a row at Glendale and a row at Avondale.
+/// hours, hourlyRate, and basePay are decimals. Base pay excludes overtime, tips, and taxes.
+model EmployeeHoursPeriod {
+  id           String              @id @default(cuid())
+  locationId   String
+  location     Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  periodStart  String
+  periodEnd    String
+  employeeName String
+  hours        Decimal             @db.Decimal(10, 2)
+  hourlyRate   Decimal             @db.Decimal(10, 2)
+  basePay      Decimal             @db.Decimal(10, 2)
+  status       EmployeeHoursStatus
+  source       String
+  syncedAt     DateTime            @default(now())
+
+  @@unique([locationId, periodStart, employeeName])
+  @@index([locationId, periodStart])
 }
 
 /// Stores secret *references* (env var names), never secret values.
