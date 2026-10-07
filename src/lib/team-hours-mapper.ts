@@ -7,8 +7,11 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
   .refine(isRealIsoDate, "Invalid calendar date");
 
-/** Decimal(10, 2) column limit. */
-const amount = z.number().finite().nonnegative().max(99_999_999.99);
+/** Decimal(10, 2) money column. */
+const money = z.number().finite().nonnegative().max(99_999_999.99);
+
+/** Hours keep up to six decimal places. */
+const hoursAmount = z.number().finite().nonnegative().max(999_999.999999);
 
 const punchTimeMessage = "Use HH:MM or an ISO timestamp with an offset";
 
@@ -22,23 +25,39 @@ const breakSchema = z.object({
   end: punchTimeText,
 });
 
+const shiftId = z.string().trim().min(1).max(80);
+
 const daySchema = z.object({
   date: isoDate,
+  shiftId,
   clockIn: punchTime.optional(),
   clockOut: punchTime.optional(),
   breaks: z.array(breakSchema).max(20),
-  hours: amount,
+  unpaidBreakMinutes: z.number().int().nonnegative().max(10_080),
+  breakTimesRecorded: z.boolean(),
+  hourlyRate: money,
+  hours: hoursAmount,
 });
+
+const openShiftSchema = z
+  .object({
+    shiftId: shiftId.optional(),
+    id: shiftId.optional(),
+    clockIn: punchTimeText,
+  })
+  .refine((value) => Boolean(value.shiftId || value.id), "Open shift needs a shiftId");
 
 const employeeSchema = z.object({
   employeeId: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(120),
   location: z.enum(["glendale", "avondale"]),
-  hourlyRate: amount,
+  hourlyRate: money,
   status: z.enum(["pending", "approved"]),
-  totalHours: amount,
-  grossPayEstimate: amount,
-  days: z.array(daySchema).max(7),
+  totalHours: hoursAmount,
+  grossPayEstimate: money,
+  appliedHourlyRates: z.array(money).max(20),
+  openShifts: z.array(openShiftSchema).max(50),
+  days: z.array(daySchema).max(40),
 });
 
 const responseSchema = z.object({
@@ -55,12 +74,23 @@ export type MappedHoursBreak = {
   end: string;
 };
 
-export type MappedHoursDay = {
+export type MappedHoursSegment = {
+  shiftId: string;
   date: string;
   clockIn: string | null;
   clockOut: string | null;
   hours: number;
+  hourlyRate: number;
+  unpaidBreakMinutes: number;
+  breakTimesRecorded: boolean;
+  /** clockOut is null and hours are 0. Not included in counted hours. */
+  open: boolean;
   breaks: MappedHoursBreak[];
+};
+
+export type MappedHoursOpenShift = {
+  shiftId: string;
+  clockIn: string;
 };
 
 export type MappedHoursEmployee = {
@@ -71,7 +101,9 @@ export type MappedHoursEmployee = {
   status: TeamHoursStatus;
   totalHours: number;
   grossPayEstimate: number;
-  days: MappedHoursDay[];
+  appliedHourlyRates: number[];
+  segments: MappedHoursSegment[];
+  openShifts: MappedHoursOpenShift[];
 };
 
 export type MappedHoursPeriod = {
@@ -114,8 +146,8 @@ export function mapTeamHoursResponse(input: unknown): MapHoursResult {
       };
     }
     seen.add(key);
-    const dates = new Set<string>();
-    const days: MappedHoursDay[] = [];
+    const segmentKeys = new Set<string>();
+    const segments: MappedHoursSegment[] = [];
     for (const day of employee.days) {
       if (day.date < data.periodStart || day.date > data.periodEnd) {
         return {
@@ -123,28 +155,56 @@ export function mapTeamHoursResponse(input: unknown): MapHoursResult {
           error: `Employee ${index + 1} day ${day.date} is outside ${data.periodStart}–${data.periodEnd}.`,
         };
       }
-      if (dates.has(day.date)) {
-        return { ok: false, error: `Employee ${employee.employeeId} has two punches on ${day.date}.` };
+      const segmentKey = `${day.shiftId}|${day.date}`;
+      if (segmentKeys.has(segmentKey)) {
+        return {
+          ok: false,
+          error: `Employee ${employee.employeeId} has two segments for shift ${day.shiftId} on ${day.date}.`,
+        };
       }
-      dates.add(day.date);
-      days.push({
+      segmentKeys.add(segmentKey);
+      const hours = round6(day.hours);
+      const clockOut = day.clockOut ?? null;
+      segments.push({
+        shiftId: day.shiftId,
         date: day.date,
         clockIn: day.clockIn ?? null,
-        clockOut: day.clockOut ?? null,
-        hours: round2(day.hours),
+        clockOut,
+        hours,
+        hourlyRate: round2(day.hourlyRate),
+        unpaidBreakMinutes: day.unpaidBreakMinutes,
+        breakTimesRecorded: day.breakTimesRecorded,
+        open: clockOut == null && hours === 0,
         breaks: day.breaks.map((brk) => ({ start: brk.start, end: brk.end })),
       });
     }
-    days.sort((a, b) => a.date.localeCompare(b.date));
+    segments.sort((a, b) => a.date.localeCompare(b.date) || a.shiftId.localeCompare(b.shiftId));
+
+    const openKeys = new Set<string>();
+    const openShifts: MappedHoursOpenShift[] = [];
+    for (const shift of employee.openShifts) {
+      const id = shift.shiftId ?? shift.id;
+      if (!id) {
+        return { ok: false, error: `Employee ${employee.employeeId} has an open shift without an id.` };
+      }
+      if (openKeys.has(id)) {
+        return { ok: false, error: `Employee ${employee.employeeId} lists open shift ${id} twice.` };
+      }
+      openKeys.add(id);
+      openShifts.push({ shiftId: id, clockIn: shift.clockIn });
+    }
+
     employees.push({
       locationId: employee.location,
       employeeId: employee.employeeId,
       employeeName: employee.name,
       hourlyRate: round2(employee.hourlyRate),
       status: employee.status,
-      totalHours: round2(employee.totalHours),
+      totalHours: round6(employee.totalHours),
       grossPayEstimate: round2(employee.grossPayEstimate),
-      days,
+      appliedHourlyRates: employee.appliedHourlyRates.map(round2),
+      segments,
+      openShifts,
     });
   }
 
@@ -185,4 +245,8 @@ function isRealIsoDate(iso: string): boolean {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function round6(n: number): number {
+  return Number(n.toFixed(6));
 }

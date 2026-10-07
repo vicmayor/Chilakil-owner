@@ -11,9 +11,12 @@
       "status": "pending",
       "totalHours": 8,
       "grossPayEstimate": 144,
+      "appliedHourlyRates": [18],
+      "openShifts": [],
       "days": [
         {
           "date": "2026-10-04",
+          "shiftId": "shift-maria-iso",
           "clockIn": "2026-10-04T07:58:00-07:00",
           "clockOut": "2026-10-04T16:05:00-07:00",
           "breaks": [
@@ -22,6 +25,9 @@
               "end": "2026-10-04T12:30:00-07:00"
             }
           ],
+          "unpaidBreakMinutes": 30,
+          "breakTimesRecorded": true,
+          "hourlyRate": 18,
           "hours": 8
         }
       ]
@@ -34,12 +40,18 @@
       "status": "approved",
       "totalHours": 4,
       "grossPayEstimate": 68,
+      "appliedHourlyRates": [17],
+      "openShifts": [],
       "days": [
         {
           "date": "2026-10-05",
+          "shiftId": "shift-luis-iso",
           "clockIn": "2026-10-05T11:00:00.000-07:00",
           "clockOut": "2026-10-05T15:00:00Z",
           "breaks": [],
+          "unpaidBreakMinutes": 0,
+          "breakTimesRecorded": true,
+          "hourlyRate": 17,
           "hours": 4
         }
       ]

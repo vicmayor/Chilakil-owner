@@ -8,16 +8,22 @@ export type SyncEmployeeHoursActionResult = {
   ok: boolean;
   connected: boolean;
   upserted: number;
+  error?: string;
 };
 
 export async function syncEmployeeHoursAction(): Promise<SyncEmployeeHoursActionResult> {
   await requireSession();
   try {
     const result = await syncTeamHours();
-    if (result.ok) revalidatePath("/employees");
-    return { ok: result.ok, connected: result.connected, upserted: result.upserted };
+    if (result.connected) revalidatePath("/employees");
+    return {
+      ok: result.ok,
+      connected: result.connected,
+      upserted: result.upserted,
+      error: result.error,
+    };
   } catch (error) {
     console.error("Employee hours sync failed", error instanceof Error ? error.message : "unknown");
-    return { ok: false, connected: true, upserted: 0 };
+    return { ok: false, connected: true, upserted: 0, error: "Couldn't sync hours." };
   }
 }

@@ -18,7 +18,7 @@ import { POST as postUberWeekly } from "../app/api/ingest/ubereats-weekly/route"
 import { GET as getEmployeeHoursSync } from "../app/api/sync/employee-hours/route";
 import { phoenixSunday, shiftIsoDate } from "./dates";
 import { syncTeamHours } from "./team-hours-sync";
-import type { TeamHoursClient } from "./team-hours-client";
+import { TeamHoursApiError, type TeamHoursClient } from "./team-hours-client";
 
 const DATES = ["2099-01-05", "2099-01-06"];
 const WEEK_START = "2099-01-05";
@@ -304,12 +304,18 @@ function teamPayload(totalHours: number) {
         status: "pending",
         totalHours,
         grossPayEstimate: 100,
+        appliedHourlyRates: [16],
+        openShifts: [],
         days: [
           {
             date: HOURS_START,
+            shiftId: "shift-ana-g",
             clockIn: "08:00",
             clockOut: "16:00",
             breaks: [{ start: "12:00", end: "12:30" }],
+            unpaidBreakMinutes: 30,
+            breakTimesRecorded: true,
+            hourlyRate: 16,
             hours: totalHours,
           },
         ],
@@ -322,12 +328,18 @@ function teamPayload(totalHours: number) {
         status: "approved",
         totalHours: 4,
         grossPayEstimate: 40,
+        appliedHourlyRates: [16],
+        openShifts: [],
         days: [
           {
             date: shiftIsoDate(HOURS_START, 1),
+            shiftId: "shift-ana-a",
             clockIn: "10:00",
             clockOut: null,
             breaks: [],
+            unpaidBreakMinutes: 0,
+            breakTimesRecorded: true,
+            hourlyRate: 16,
             hours: 4,
           },
         ],
@@ -394,6 +406,8 @@ test("team hours sync stores punches by employee id and keeps both locations", a
   const all = await loadEmployeeHoursView("all");
   const period = all.periods.find((item) => item.periodStart === HOURS_START);
   assert.ok(period);
+  assert.equal(period.status, "pending");
+  assert.equal(period.statusCoversBothLocations, true);
   assert.deepEqual(
     period.locations.map((block) => [block.locationId, block.grossPayEstimate, block.squareSales, block.laborPct]),
     [["glendale", 100, 500, 0.2]],
@@ -404,12 +418,55 @@ test("team hours sync stores punches by employee id and keeps both locations", a
   assert.equal(glendalePeriod?.locations[0].locationId, "glendale");
 });
 
+test("a 503 keeps the last synced hours and records the error", async () => {
+  await cleanup();
+  const client: TeamHoursClient = {
+    async fetchHours() {
+      return teamPayload(10);
+    },
+  };
+  const first = await syncTeamHours({ client, periodStarts: [HOURS_START], location: "all" });
+  assert.equal(first.ok, true);
+  const before = await prisma.employeeHoursPeriod.findMany({
+    where: { employeeId: "emp-sync-ana", periodStart: HOURS_START },
+    orderBy: { locationId: "asc" },
+  });
+  assert.equal(before.length, 2);
+  const success = await prisma.teamHoursSyncState.findUnique({ where: { id: "default" } });
+  assert.ok(success?.lastSuccessAt);
+  assert.equal(success.lastError, null);
+
+  const down: TeamHoursClient = {
+    async fetchHours() {
+      throw new TeamHoursApiError(503);
+    },
+  };
+  const second = await syncTeamHours({ client: down, periodStarts: [HOURS_START], location: "all" });
+  assert.equal(second.ok, false);
+  assert.equal(second.connected, true);
+  assert.match(second.error ?? "", /temporarily unavailable/);
+
+  const after = await prisma.employeeHoursPeriod.findMany({
+    where: { employeeId: "emp-sync-ana", periodStart: HOURS_START },
+    orderBy: { locationId: "asc" },
+  });
+  assert.deepEqual(
+    after.map((row) => [row.locationId, row.totalHours.toNumber(), row.syncedAt.toISOString()]),
+    before.map((row) => [row.locationId, row.totalHours.toNumber(), row.syncedAt.toISOString()]),
+  );
+  const failed = await prisma.teamHoursSyncState.findUnique({ where: { id: "default" } });
+  assert.match(failed?.lastError ?? "", /temporarily unavailable/);
+  assert.equal(failed?.lastSuccessAt?.toISOString(), success.lastSuccessAt.toISOString());
+});
+
 test("employee hours sync is unauthorized without a bearer token and not connected without team env", async () => {
   process.env.INGEST_TOKEN = process.env.INGEST_TOKEN || "upsert-test-token";
   await cleanup();
   const previousUrl = process.env.CHILAKIL_TEAM_API_URL;
+  const previousKey = process.env.CHILAKIL_TEAM_API_KEY;
   const previousToken = process.env.CHILAKIL_TEAM_API_TOKEN;
   delete process.env.CHILAKIL_TEAM_API_URL;
+  delete process.env.CHILAKIL_TEAM_API_KEY;
   delete process.env.CHILAKIL_TEAM_API_TOKEN;
   try {
     const unauthorized = await getEmployeeHoursSync(
@@ -429,6 +486,8 @@ test("employee hours sync is unauthorized without a bearer token and not connect
   } finally {
     if (previousUrl === undefined) delete process.env.CHILAKIL_TEAM_API_URL;
     else process.env.CHILAKIL_TEAM_API_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.CHILAKIL_TEAM_API_KEY;
+    else process.env.CHILAKIL_TEAM_API_KEY = previousKey;
     if (previousToken === undefined) delete process.env.CHILAKIL_TEAM_API_TOKEN;
     else process.env.CHILAKIL_TEAM_API_TOKEN = previousToken;
   }

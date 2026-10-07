@@ -2,19 +2,23 @@ import { prisma } from "@/lib/db";
 import { phoenixSunday, phoenixToday, shiftIsoDate } from "@/lib/dates";
 import {
   createTeamHoursClient,
+  TeamHoursApiError,
   type TeamHoursClient,
   type TeamHoursLocationQuery,
 } from "@/lib/team-hours-client";
-import { mapTeamHoursResponse, type MappedHoursEmployee } from "@/lib/team-hours-mapper";
+import { mapTeamHoursResponse, type MappedHoursEmployee, type MappedHoursPeriod } from "@/lib/team-hours-mapper";
 
 /** How many Sunday–Saturday periods Sync now and cron pull, newest first. */
 export const PAY_PERIODS_TO_SYNC = 8;
+
+const SYNC_STATE_ID = "default";
 
 export type SyncTeamHoursResult = {
   ok: boolean;
   connected: boolean;
   upserted: number;
   periods: number;
+  error?: string;
 };
 
 export function recentPayPeriodStarts(today = phoenixToday(), count = PAY_PERIODS_TO_SYNC): string[] {
@@ -23,8 +27,9 @@ export function recentPayPeriodStarts(today = phoenixToday(), count = PAY_PERIOD
 }
 
 /**
- * Pull hours from the Team API and replace stored punches for those periods.
- * A missing client means the env vars are unset: connected is false and nothing is thrown.
+ * Pull hours from the Team API and replace stored rows for those periods.
+ * A missing client means the key is unset: connected is false and nothing is thrown.
+ * 401, 400, 503, and network failures keep the last stored week and record the error.
  */
 export async function syncTeamHours(options?: {
   client?: TeamHoursClient | null;
@@ -38,20 +43,70 @@ export async function syncTeamHours(options?: {
     return { ok: false, connected: false, upserted: 0, periods: 0 };
   }
 
-  let upserted = 0;
+  const ready: MappedHoursPeriod[] = [];
   for (const periodStart of periodStarts) {
-    const payload = await client.fetchHours({ periodStart, location });
-    const mapped = mapTeamHoursResponse(payload);
-    if (!mapped.ok) {
-      throw new Error(mapped.error);
+    try {
+      const payload = await client.fetchHours({ periodStart, location });
+      const mapped = mapTeamHoursResponse(payload);
+      if (!mapped.ok) throw new Error(mapped.error);
+      if (mapped.period.periodStart !== periodStart) {
+        throw new Error(`Team hours period ${mapped.period.periodStart} did not match requested ${periodStart}.`);
+      }
+      ready.push(mapped.period);
+    } catch (error) {
+      const message = retainMessage(error);
+      if (!message) throw error;
+      await recordSyncError(message);
+      return { ok: false, connected: true, upserted: 0, periods: 0, error: message };
     }
-    if (mapped.period.periodStart !== periodStart) {
-      throw new Error(`Team hours period ${mapped.period.periodStart} did not match requested ${periodStart}.`);
-    }
-    upserted += await replacePeriod(mapped.period.periodStart, mapped.period.periodEnd, mapped.period.employees, location);
   }
 
-  return { ok: true, connected: true, upserted, periods: periodStarts.length };
+  const syncedAt = new Date();
+  let upserted = 0;
+  for (const period of ready) {
+    upserted += await replacePeriod(period.periodStart, period.periodEnd, period.employees, location, syncedAt);
+  }
+  await recordSyncSuccess(syncedAt);
+  return { ok: true, connected: true, upserted, periods: ready.length };
+}
+
+function retainMessage(error: unknown): string | null {
+  if (error instanceof TeamHoursApiError) {
+    if (error.status === 401) return "Team API rejected the key. Last hours are unchanged.";
+    if (error.status === 400) return "Team API rejected the pay period. Last hours are unchanged.";
+    if (error.status === 503) return "Team hours are temporarily unavailable. Last hours are unchanged.";
+    return null;
+  }
+  if (error instanceof TypeError || isNetworkError(error)) {
+    return "Couldn't reach the Team API. Last hours are unchanged.";
+  }
+  if (error instanceof Error) {
+    return `${error.message} Last hours are unchanged.`;
+  }
+  return "Couldn't sync hours. Last hours are unchanged.";
+}
+
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === "AbortError" || error.name === "TimeoutError") return true;
+  return /fetch failed|network|ECONNREFUSED|ENOTFOUND|ETIMEDOUT/i.test(error.message);
+}
+
+async function recordSyncSuccess(at: Date): Promise<void> {
+  await prisma.teamHoursSyncState.upsert({
+    where: { id: SYNC_STATE_ID },
+    create: { id: SYNC_STATE_ID, lastSuccessAt: at, lastError: null, lastErrorAt: null },
+    update: { lastSuccessAt: at, lastError: null, lastErrorAt: null },
+  });
+}
+
+async function recordSyncError(message: string): Promise<void> {
+  const at = new Date();
+  await prisma.teamHoursSyncState.upsert({
+    where: { id: SYNC_STATE_ID },
+    create: { id: SYNC_STATE_ID, lastError: message, lastErrorAt: at },
+    update: { lastError: message, lastErrorAt: at },
+  });
 }
 
 async function replacePeriod(
@@ -59,9 +114,9 @@ async function replacePeriod(
   periodEnd: string,
   employees: MappedHoursEmployee[],
   location: TeamHoursLocationQuery,
+  syncedAt: Date,
 ): Promise<number> {
   const rows = employees.filter((employee) => location === "all" || employee.locationId === location);
-  const syncedAt = new Date();
   await prisma.$transaction(
     async (tx) => {
       for (const employee of rows) {
@@ -95,17 +150,41 @@ async function replacePeriod(
             syncedAt,
           },
         });
+        await tx.employeeHoursAppliedRate.deleteMany({ where: { periodId: saved.id } });
+        await tx.employeeHoursOpenShift.deleteMany({ where: { periodId: saved.id } });
         await tx.employeeHoursDay.deleteMany({ where: { periodId: saved.id } });
-        for (const day of employee.days) {
+        if (employee.appliedHourlyRates.length > 0) {
+          await tx.employeeHoursAppliedRate.createMany({
+            data: employee.appliedHourlyRates.map((hourlyRate, index) => ({
+              periodId: saved.id,
+              hourlyRate,
+              sortOrder: index,
+            })),
+          });
+        }
+        if (employee.openShifts.length > 0) {
+          await tx.employeeHoursOpenShift.createMany({
+            data: employee.openShifts.map((shift) => ({
+              periodId: saved.id,
+              shiftId: shift.shiftId,
+              clockIn: shift.clockIn,
+            })),
+          });
+        }
+        for (const segment of employee.segments) {
           await tx.employeeHoursDay.create({
             data: {
               periodId: saved.id,
-              date: day.date,
-              clockIn: day.clockIn,
-              clockOut: day.clockOut,
-              hours: day.hours,
+              shiftId: segment.shiftId,
+              date: segment.date,
+              clockIn: segment.clockIn,
+              clockOut: segment.clockOut,
+              hours: segment.hours,
+              hourlyRate: segment.hourlyRate,
+              unpaidBreakMinutes: segment.unpaidBreakMinutes,
+              breakTimesRecorded: segment.breakTimesRecorded,
               breaks: {
-                create: day.breaks.map((brk, index) => ({
+                create: segment.breaks.map((brk, index) => ({
                   start: brk.start,
                   end: brk.end,
                   sortOrder: index,

@@ -14,12 +14,22 @@ export type EmployeeHoursBreak = {
   end: string;
 };
 
-export type EmployeeHoursDay = {
+export type EmployeeHoursSegment = {
+  shiftId: string;
   date: string;
   clockIn: string | null;
   clockOut: string | null;
   hours: number;
+  hourlyRate: number;
+  unpaidBreakMinutes: number;
+  breakTimesRecorded: boolean;
+  open: boolean;
   breaks: EmployeeHoursBreak[];
+};
+
+export type EmployeeHoursOpenShift = {
+  shiftId: string;
+  clockIn: string;
 };
 
 export type EmployeeHoursRow = {
@@ -32,8 +42,10 @@ export type EmployeeHoursRow = {
   totalHours: number;
   grossPayEstimate: number;
   status: TeamHoursStatus;
+  appliedHourlyRates: number[];
+  segments: EmployeeHoursSegment[];
+  openShifts: EmployeeHoursOpenShift[];
   syncedAt?: string;
-  days: EmployeeHoursDay[];
 };
 
 export type SquareSalesDay = {
@@ -42,14 +54,22 @@ export type SquareSalesDay = {
   grossSales: number;
 };
 
+export type EmployeeDateHours = {
+  date: string;
+  hours: number;
+};
+
 export type EmployeeHoursLine = {
   employeeId: string;
   employeeName: string;
   hours: number;
   hourlyRate: number;
   grossPayEstimate: number;
-  status: TeamHoursStatus;
-  days: EmployeeHoursDay[];
+  appliedHourlyRates: number[];
+  segments: EmployeeHoursSegment[];
+  openShifts: EmployeeHoursOpenShift[];
+  /** Closed segments only. Open shifts are listed separately and add nothing. */
+  dateHours: EmployeeDateHours[];
 };
 
 export type LocationHoursBlock = {
@@ -61,28 +81,32 @@ export type LocationHoursBlock = {
   periodDays: number;
   /** Gross pay estimate divided by this location's Square gross. Null when sales are zero. */
   laborPct: number | null;
-  review: "pending" | "approved" | "mixed";
-  pendingCount: number;
-  approvedCount: number;
   employees: EmployeeHoursLine[];
 };
 
 export type PayPeriodHours = {
   periodStart: string;
   periodEnd: string;
+  /** Team approval for the whole pay period. It is not per location or per employee. */
+  status: TeamHoursStatus;
+  statusCoversBothLocations: true;
   locations: LocationHoursBlock[];
 };
 
 export type EmployeeHoursView = {
   periods: PayPeriodHours[];
   latestSyncedAt: string | null;
+  lastError: string | null;
 };
 
 /**
  * Pay periods for the location switcher.
  * ALL returns one labeled block per location that has rows. It does not add
  * hours, gross pay, or labor % across Glendale and Avondale.
+ * Period status is computed from every location's rows, then the other store's
+ * hours are hidden when a single location is selected.
  * Labor % uses that location's Square gross (daily sales) on the pay-period dates.
+ * Hours and gross pay come from Team. Open shifts are not added in.
  */
 export function buildEmployeeHoursView(
   rows: EmployeeHoursRow[],
@@ -90,9 +114,8 @@ export function buildEmployeeHoursView(
   scope: LocationScope,
 ): EmployeeHoursView {
   const allowed = new Set(locationIdsForScope(scope));
-  const scoped = rows.filter((row) => allowed.has(row.locationId));
   const groups = new Map<string, EmployeeHoursRow[]>();
-  for (const row of scoped) {
+  for (const row of rows) {
     const key = `${row.periodStart}|${row.periodEnd}`;
     const list = groups.get(key);
     if (list) list.push(row);
@@ -101,15 +124,17 @@ export function buildEmployeeHoursView(
 
   const periods = [...groups.entries()]
     .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
-    .map(([, periodRows]) => {
+    .flatMap(([, periodRows]) => {
       const periodStart = periodRows[0].periodStart;
       const periodEnd = periodRows[0].periodEnd;
+      const visible = periodRows.filter((row) => allowed.has(row.locationId));
+      if (visible.length === 0) return [];
       const locations = LOCATION_IDS.filter((id) => allowed.has(id)).flatMap((locationId) => {
-        const employees = periodRows
+        const employees = visible
           .filter((row) => row.locationId === locationId)
           .sort((a, b) => a.employeeName.localeCompare(b.employeeName, "en") || a.employeeId.localeCompare(b.employeeId));
         if (employees.length === 0) return [];
-        const hours = round2(employees.reduce((sum, row) => sum + row.totalHours, 0));
+        const hours = round6(employees.reduce((sum, row) => sum + row.totalHours, 0));
         const grossPayEstimate = round2(employees.reduce((sum, row) => sum + row.grossPayEstimate, 0));
         const salesByDate = new Map<string, number>();
         for (const day of sales) {
@@ -118,8 +143,6 @@ export function buildEmployeeHoursView(
           salesByDate.set(day.date, day.grossSales);
         }
         const squareSales = round2([...salesByDate.values()].reduce((sum, gross) => sum + gross, 0));
-        const pendingCount = employees.filter((row) => row.status === "pending").length;
-        const approvedCount = employees.length - pendingCount;
         const block: LocationHoursBlock = {
           locationId,
           hours,
@@ -128,45 +151,86 @@ export function buildEmployeeHoursView(
           salesDaysOnFile: salesByDate.size,
           periodDays: inclusiveIsoDays(periodStart, periodEnd),
           laborPct: squareSales > 0 ? grossPayEstimate / squareSales : null,
-          review: pendingCount === 0 ? "approved" : approvedCount === 0 ? "pending" : "mixed",
-          pendingCount,
-          approvedCount,
           employees: employees.map((row) => ({
             employeeId: row.employeeId,
             employeeName: row.employeeName,
             hours: row.totalHours,
             hourlyRate: row.hourlyRate,
             grossPayEstimate: row.grossPayEstimate,
-            status: row.status,
-            days: row.days,
+            appliedHourlyRates: row.appliedHourlyRates,
+            segments: row.segments,
+            openShifts: row.openShifts,
+            dateHours: dateHours(row.segments),
           })),
         };
         return [block];
       });
-      return { periodStart, periodEnd, locations };
+      const period: PayPeriodHours = {
+        periodStart,
+        periodEnd,
+        status: periodRows.some((row) => row.status === "pending") ? "pending" : "approved",
+        statusCoversBothLocations: true,
+        locations,
+      };
+      return [period];
     });
 
   let latestSyncedAt: string | null = null;
-  for (const row of scoped) {
+  for (const row of rows) {
     if (!row.syncedAt) continue;
     if (!latestSyncedAt || row.syncedAt > latestSyncedAt) latestSyncedAt = row.syncedAt;
   }
 
-  return { periods, latestSyncedAt };
+  return { periods, latestSyncedAt, lastError: null };
+}
+
+export function dateHours(segments: EmployeeHoursSegment[]): EmployeeDateHours[] {
+  const totals = new Map<string, number>();
+  for (const segment of segments) {
+    if (segment.open) continue;
+    totals.set(segment.date, (totals.get(segment.date) ?? 0) + segment.hours);
+  }
+  return [...totals.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, hours]) => ({ date, hours: round6(hours) }));
+}
+
+/** Empty break times are not "no break" when Team did not record the clock times. */
+export function unpaidBreakNote(segment: Pick<EmployeeHoursSegment, "unpaidBreakMinutes" | "breakTimesRecorded">): string | null {
+  if (!segment.breakTimesRecorded) {
+    if (segment.unpaidBreakMinutes > 0) {
+      return `${segment.unpaidBreakMinutes} min unpaid break, already deducted. Break times were not recorded.`;
+    }
+    return "Break times were not recorded.";
+  }
+  if (segment.unpaidBreakMinutes > 0) {
+    return `${segment.unpaidBreakMinutes} min unpaid break, already deducted.`;
+  }
+  return null;
 }
 
 export async function loadEmployeeHoursView(scope: LocationScope): Promise<EmployeeHoursView> {
   const ids = locationIdsForScope(scope);
-  const rows = await prisma.employeeHoursPeriod.findMany({
-    where: { locationId: { in: ids } },
-    include: {
-      days: {
-        orderBy: { date: "asc" },
-        include: { breaks: { orderBy: { sortOrder: "asc" } } },
+  const [rows, state] = await Promise.all([
+    prisma.employeeHoursPeriod.findMany({
+      include: {
+        days: {
+          orderBy: [{ date: "asc" }, { shiftId: "asc" }],
+          include: { breaks: { orderBy: { sortOrder: "asc" } } },
+        },
+        appliedHourlyRates: { orderBy: { sortOrder: "asc" } },
+        openShifts: { orderBy: { shiftId: "asc" } },
       },
-    },
-  });
-  if (rows.length === 0) return buildEmployeeHoursView([], [], scope);
+    }),
+    prisma.teamHoursSyncState.findUnique({ where: { id: "default" } }),
+  ]);
+  if (rows.length === 0) {
+    return {
+      periods: [],
+      latestSyncedAt: state?.lastSuccessAt?.toISOString() ?? null,
+      lastError: state?.lastError ?? null,
+    };
+  }
 
   const periodStart = rows.reduce(
     (min, row) => (row.periodStart < min ? row.periodStart : min),
@@ -184,7 +248,7 @@ export async function loadEmployeeHoursView(scope: LocationScope): Promise<Emplo
     select: { locationId: true, date: true, grossSales: true },
   });
 
-  return buildEmployeeHoursView(
+  const view = buildEmployeeHoursView(
     rows.flatMap((row) => {
       if (!isLocationId(row.locationId)) return [];
       return [
@@ -198,14 +262,24 @@ export async function loadEmployeeHoursView(scope: LocationScope): Promise<Emplo
           totalHours: decimalToNumber(row.totalHours),
           grossPayEstimate: decimalToNumber(row.grossPayEstimate),
           status: row.status,
+          appliedHourlyRates: row.appliedHourlyRates.map((rate) => decimalToNumber(rate.hourlyRate)),
+          openShifts: row.openShifts.map((shift) => ({ shiftId: shift.shiftId, clockIn: shift.clockIn })),
           syncedAt: row.syncedAt.toISOString(),
-          days: row.days.map((day) => ({
-            date: day.date,
-            clockIn: day.clockIn,
-            clockOut: day.clockOut,
-            hours: decimalToNumber(day.hours),
-            breaks: day.breaks.map((brk) => ({ start: brk.start, end: brk.end })),
-          })),
+          segments: row.days.map((day) => {
+            const hours = decimalToNumber(day.hours);
+            return {
+              shiftId: day.shiftId,
+              date: day.date,
+              clockIn: day.clockIn,
+              clockOut: day.clockOut,
+              hours,
+              hourlyRate: decimalToNumber(day.hourlyRate),
+              unpaidBreakMinutes: day.unpaidBreakMinutes,
+              breakTimesRecorded: day.breakTimesRecorded,
+              open: day.clockOut == null && hours === 0,
+              breaks: day.breaks.map((brk) => ({ start: brk.start, end: brk.end })),
+            };
+          }),
         },
       ];
     }),
@@ -215,6 +289,11 @@ export async function loadEmployeeHoursView(scope: LocationScope): Promise<Emplo
     }),
     scope,
   );
+  return {
+    ...view,
+    latestSyncedAt: state?.lastSuccessAt?.toISOString() ?? view.latestSyncedAt,
+    lastError: state?.lastError ?? null,
+  };
 }
 
 function decimalToNumber(value: Prisma.Decimal): number {
@@ -230,4 +309,8 @@ function inclusiveIsoDays(start: string, end: string): number {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function round6(n: number): number {
+  return Number(n.toFixed(6));
 }
