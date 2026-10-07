@@ -4,20 +4,52 @@ import { locationIdsForScope, isCombinedScope, COMBINED_LABEL } from "@/lib/loca
 import { phoenixToday } from "@/lib/dates";
 import { moneyExact, pct } from "@/lib/format";
 import { getDashboardData } from "@/lib/metrics";
+import { groupFoodCostLocations } from "@/lib/food-cost";
 import { TopBar } from "@/components/top-bar";
 import { Card, CombinedBadge, LocationDot } from "@/components/ui";
+import { FoodCostSimulator } from "@/components/food-cost-simulator";
 
 export const metadata = { title: "Food Cost" };
 
 export default async function FoodCostPage() {
   const scope = await getLocationScope();
   const ids = locationIdsForScope(scope);
-  const data = await getDashboardData(scope);
-  const items = await prisma.menuItem.findMany({
-    where: { locationId: { in: ids }, active: true },
-    include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
-    orderBy: { name: "asc" },
-  });
+  const [data, items, ingredients] = await Promise.all([
+    getDashboardData(scope),
+    prisma.menuItem.findMany({
+      where: { locationId: { in: ids }, active: true },
+      include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.ingredient.findMany({
+      where: { locationId: { in: ids } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  const workbook = groupFoodCostLocations(
+    ids,
+    ingredients.map((ingredient) => ({
+      id: ingredient.id,
+      locationId: ingredient.locationId,
+      name: ingredient.name,
+      unit: ingredient.unit,
+      costPerUnit: ingredient.costPerUnit,
+    })),
+    items.map((item) => ({
+      id: item.id,
+      locationId: item.locationId,
+      name: item.name,
+      category: item.category,
+      price: item.price,
+      lines: (item.recipe?.ingredients ?? []).map((line) => ({
+        ingredientId: line.ingredientId,
+        name: line.ingredient.name,
+        unit: line.ingredient.unit,
+        quantity: line.quantity,
+      })),
+    })),
+  );
 
   return (
     <>
@@ -53,41 +85,7 @@ export default async function FoodCostPage() {
           </Card>
         ))}
 
-        {ids.map((id) => {
-          const rows = items
-            .filter((i) => i.locationId === id)
-            .map((item) => {
-              const cost =
-                item.recipe?.ingredients.reduce(
-                  (s, line) => s + line.quantity * line.ingredient.costPerUnit,
-                  0,
-                ) ?? 0;
-              return { item, cost, pct: item.price > 0 ? cost / item.price : 0 };
-            })
-            .sort((a, b) => b.pct - a.pct);
-          return (
-            <Card key={id}>
-              <h2 className="text-sm font-semibold">
-                <LocationDot id={id} />
-              </h2>
-              <ul className="mt-2 divide-y divide-line">
-                {rows.map(({ item, cost, pct: p }) => (
-                  <li key={item.id} className="flex items-center justify-between py-2.5">
-                    <div>
-                      <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-muted">
-                        Sell {moneyExact(item.price)} · recipe {moneyExact(cost)}
-                      </p>
-                    </div>
-                    <p className={`tabular text-sm font-semibold ${p > 0.32 ? "text-warn" : "text-sage"}`}>
-                      {pct(p)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          );
-        })}
+        <FoodCostSimulator key={ids.join("-")} locations={workbook} />
       </main>
     </>
   );
