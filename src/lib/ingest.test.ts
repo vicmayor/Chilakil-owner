@@ -2,12 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { csvToRecords } from "./csv";
 import { DOORDASH_STORE_IDS } from "./doordash-stores";
+import { UBEREATS_STORE_IDS } from "./ubereats-stores";
 import {
   DAILY_SALES_NUMERIC_COLUMNS,
   DOORDASH_WEEKLY_NUMERIC_COLUMNS,
+  UBEREATS_WEEKLY_NUMERIC_COLUMNS,
   bearerMatches,
   parseDailySalesBody,
   parseDoorDashWeeklyBody,
+  parseUberEatsWeeklyBody,
 } from "./ingest";
 
 const daily = {
@@ -156,6 +159,117 @@ glendale,${DOORDASH_STORE_IDS.glendale},2026-09-28,2026-10-04,1000,10,300,700,"d
   assert.equal(parsed.ok, true);
   if (!parsed.ok) return;
   assert.equal(parsed.records[0].source, "doordash, export");
+});
+
+const glendaleUber = {
+  location: "glendale",
+  uberStoreId: UBEREATS_STORE_IDS.glendale,
+  weekStart: "2026-09-28",
+  weekEnd: "2026-10-04",
+  subtotal: 1403.97,
+  tax: 143.3,
+  gross: 1547.27,
+  orderCount: 49,
+  deliveryOrders: 48,
+  pickupOrders: 1,
+  commission: -371.47,
+  marketingFees: -154.5,
+  promoFees: -32.67,
+  adjustments: -210.74,
+  errorCharges: null,
+  netPayout: 777.89,
+  source: "ubereats-merchant-statement-2026-10-04",
+  notes: "Ignored extra field from the merchant statement.",
+};
+
+const avondaleUber = {
+  location: "avondale",
+  uberStoreId: UBEREATS_STORE_IDS.avondale.toUpperCase(),
+  weekStart: "2026-09-28",
+  weekEnd: "2026-10-04",
+  subtotal: 703,
+  tax: 61.89,
+  gross: 764.89,
+  orderCount: 25,
+  deliveryOrders: 22,
+  pickupOrders: 3,
+  commission: -183.23,
+  marketingFees: -27.2,
+  promoFees: -4.95,
+  adjustments: 0,
+  errorCharges: null,
+  netPayout: 549.51,
+  source: "ubereats-merchant-statement-2026-10-04",
+};
+
+test("weekly Uber Eats keeps signed fees, a null error charge, and separate promo fees", () => {
+  const parsed = parseUberEatsWeeklyBody({ records: [glendaleUber, avondaleUber] });
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.deepEqual(
+    parsed.records.map((record) => record.locationId),
+    ["glendale", "avondale"],
+  );
+  const glendale = parsed.records[0];
+  assert.equal(glendale.uberStoreId, UBEREATS_STORE_IDS.glendale);
+  assert.equal(glendale.commission, -371.47);
+  assert.equal(glendale.marketingFees, -154.5);
+  assert.equal(glendale.promoFees, -32.67);
+  assert.equal(glendale.adjustments, -210.74);
+  assert.equal(glendale.errorCharges, null);
+  assert.equal(glendale.tax, 143.3);
+  assert.equal(glendale.deliveryOrders, 48);
+  assert.equal(glendale.pickupOrders, 1);
+  assert.equal(parsed.records[1].uberStoreId, UBEREATS_STORE_IDS.avondale);
+  assert.equal(parsed.records[1].locationId, "avondale");
+});
+
+test("weekly Uber Eats rejects a store id that belongs to the other location", () => {
+  const parsed = parseUberEatsWeeklyBody({
+    ...glendaleUber,
+    uberStoreId: UBEREATS_STORE_IDS.avondale,
+  });
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.match(parsed.issues.join(" "), /not glendale/i);
+    assert.match(parsed.issues.join(" "), /across locations/i);
+  }
+});
+
+test("weekly Uber Eats rejects an unknown store, a short week, and the sample source", () => {
+  const unknown = parseUberEatsWeeklyBody({
+    ...glendaleUber,
+    uberStoreId: "00000000-0000-0000-0000-000000000000",
+  });
+  assert.equal(unknown.ok, false);
+  if (!unknown.ok) assert.match(unknown.issues.join(" "), /not a Chilakil store/);
+
+  const short = parseUberEatsWeeklyBody({
+    ...glendaleUber,
+    weekEnd: "2026-10-03",
+  });
+  assert.equal(short.ok, false);
+  if (!short.ok) assert.match(short.issues.join(" "), /weekEnd/);
+
+  const sample = parseUberEatsWeeklyBody({ ...glendaleUber, source: "sample" });
+  assert.equal(sample.ok, false);
+
+  const duplicate = parseUberEatsWeeklyBody([glendaleUber, glendaleUber]);
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.match(duplicate.error, /Duplicate/);
+});
+
+test("Uber Eats CSV keeps a null error charge empty and a signed commission", () => {
+  const csv = [
+    "location,uberStoreId,weekStart,weekEnd,subtotal,tax,gross,orderCount,deliveryOrders,pickupOrders,commission,marketingFees,promoFees,adjustments,errorCharges,netPayout,source",
+    `avondale,${UBEREATS_STORE_IDS.avondale},2026-09-28,2026-10-04,703,61.89,764.89,25,22,3,-183.23,-27.20,-4.95,0,,549.51,ubereats-export`,
+  ].join("\n");
+  const parsed = parseUberEatsWeeklyBody(csvToRecords(csv, UBEREATS_WEEKLY_NUMERIC_COLUMNS));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.records[0].commission, -183.23);
+  assert.equal(parsed.records[0].errorCharges, null);
+  assert.equal(parsed.records[0].promoFees, -4.95);
 });
 
 test("ingest auth requires the bearer token and ignores a different length", () => {

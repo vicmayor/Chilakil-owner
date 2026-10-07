@@ -4,6 +4,7 @@ import { csvToRecords } from "../src/lib/csv";
 import {
   DAILY_SALES_NUMERIC_COLUMNS,
   DOORDASH_WEEKLY_NUMERIC_COLUMNS,
+  UBEREATS_WEEKLY_NUMERIC_COLUMNS,
 } from "../src/lib/ingest";
 import { loadEnvFile } from "../src/lib/load-env";
 
@@ -18,13 +19,17 @@ const kinds = {
     path: "/api/ingest/doordash-weekly",
     numeric: DOORDASH_WEEKLY_NUMERIC_COLUMNS,
   },
+  "ubereats-weekly": {
+    path: "/api/ingest/ubereats-weekly",
+    numeric: UBEREATS_WEEKLY_NUMERIC_COLUMNS,
+  },
 } as const;
 
 async function main() {
   const kind = process.argv[2] as keyof typeof kinds | undefined;
   const file = process.argv[3];
   if (!kind || !(kind in kinds) || !file) {
-    console.error("Usage: npm run ingest -- <daily-sales|doordash-weekly> <file.json|file.csv>");
+    console.error("Usage: npm run ingest -- <daily-sales|doordash-weekly|ubereats-weekly> <file.json|file.csv>");
     process.exit(1);
   }
 

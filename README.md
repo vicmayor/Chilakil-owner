@@ -105,13 +105,14 @@ Leave `SEED_SAMPLE` unset for that command. It upserts the two locations and the
 
 7. Add to the iPhone Home Screen from Safari. Confirm the icon is the Chilakil mark.
 
-## Import daily sales and DoorDash weeks
+## Import daily sales and delivery weeks
 
-`POST /api/ingest/daily-sales` and `POST /api/ingest/doordash-weekly` require `Authorization: Bearer $INGEST_TOKEN`. Each accepts one JSON object, a JSON array, or `{ "records": [ ... ] }`. CSV is accepted when `Content-Type` is `text/csv`. Unknown locations are rejected. A DoorDash store id must match the location (`32669627` Glendale, `27859030` Avondale) or the whole request is rejected and nothing is written. Re-posting the same location and date (or location and week start) updates that row.
+`POST /api/ingest/daily-sales`, `POST /api/ingest/doordash-weekly`, and `POST /api/ingest/ubereats-weekly` require `Authorization: Bearer $INGEST_TOKEN`. Each accepts one JSON object, a JSON array, or `{ "records": [ ... ] }`. CSV is accepted when `Content-Type` is `text/csv`. Unknown locations are rejected. A store id must match the location or the whole request is rejected and nothing is written. DoorDash stores are `32669627` Glendale and `27859030` Avondale. Uber Eats stores are `91bb8a8e-e9c5-5c0d-88a0-671cb75faf20` Glendale and `a4232345-3850-5bb6-92bf-27434a445d64` Avondale (Uber may label that store Phoenix). `weekEnd` must be six days after `weekStart`. Re-posting the same location and date (or location and week start) updates that row. Uber Eats fee fields keep the statement sign, and `errorCharges` may be null.
 
 ```bash
 npm run ingest -- daily-sales examples/daily-sales.json
 npm run ingest -- doordash-weekly examples/doordash-weekly.csv
+npm run ingest -- ubereats-weekly examples/ubereats-weekly.json
 ```
 
 Example files live in `examples/`. `source` cannot be `sample` on these endpoints; that value is only for the local demo seed.
@@ -122,7 +123,7 @@ Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid
 
 1. Dashboard — today’s gross, delivery, estimated net after fees, labor, estimated food cost, order count, average ticket, alerts
 2. Sales — channel mix, 5-day trend, recent tickets
-3. DoorDash / 4. Uber Eats / 5. Grubhub — per-location daily summaries + secret-ref placeholders
+3. DoorDash / 4. Uber Eats / 5. Grubhub — per-location daily summaries + secret-ref placeholders. DoorDash and Uber Eats also show merchant weeks, one card per location. ALL is the only view that adds a labeled combined total.
 6. Expenses
 7. Food Cost — theoretical vs purchases + recipe %
 8. Menu & Recipes
@@ -151,6 +152,7 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `DailySales` + `Order` — channel mix: `in_store | doordash | ubereats | grubhub | other`
 - `DailySalesRecord` — one imported Phoenix day per location (unique on location + date)
 - `DoorDashWeeklyReport` — one DoorDash merchant week per location (unique on location + week start)
+- `UberEatsWeeklyReport` — one Uber Eats merchant week per location (unique on location + week start)
 - `DeliverySummary` — per location + platform + date
 - `DailyOps` — labor hours/cost, theoretical food cost, actual purchases, targets
 - `Expense`, `Ingredient`, `Recipe`, `RecipeIngredient`, `MenuItem`
@@ -176,7 +178,7 @@ Today’s seeded shape (Phoenix “today”, not a fixed calendar date):
 
 See `.env.example`. Required: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `INGEST_TOKEN`, `OWNER_EMAIL`, `OWNER_PASSWORD`. Optional: `OPENAI_API_KEY`, `APP_URL`, `OWNER_NAME`, `SEED_SAMPLE`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
 
-`DailySales` is still the channel-level sample mix. Imported days live in `DailySalesRecord` (unique on location + Phoenix date). DoorDash merchant weeks live in `DoorDashWeeklyReport` (unique on location + week start). The dashboard uses `DailySalesRecord` for today when a row exists.
+`DailySales` is still the channel-level sample mix. Imported days live in `DailySalesRecord` (unique on location + Phoenix date). DoorDash merchant weeks live in `DoorDashWeeklyReport` and Uber Eats merchant weeks live in `UberEatsWeeklyReport` (each unique on location + week start). The dashboard uses `DailySalesRecord` for today when a row exists.
 
 ## Tests
 

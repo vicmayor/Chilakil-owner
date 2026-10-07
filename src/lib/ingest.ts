@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { DOORDASH_STORE_IDS, locationForDoorDashStore } from "@/lib/doordash-stores";
+import { UBEREATS_STORE_IDS, locationForUberStore } from "@/lib/ubereats-stores";
 import type { LocationId } from "@/lib/location";
 
 const MAX_BATCH = 400;
@@ -82,6 +83,28 @@ export const doorDashWeeklyRecordSchema = z
     path: ["subtotal"],
   });
 
+const signedMoney = z.number().finite();
+
+export const uberEatsWeeklyRecordSchema = z.object({
+  location: z.enum(["glendale", "avondale"]),
+  uberStoreId: z.string().trim().min(1),
+  weekStart: isoDate,
+  weekEnd: isoDate,
+  subtotal: nonNegMoney,
+  tax: nonNegMoney,
+  gross: nonNegMoney,
+  orderCount: count,
+  deliveryOrders: count,
+  pickupOrders: count,
+  commission: signedMoney,
+  marketingFees: signedMoney,
+  promoFees: signedMoney,
+  adjustments: signedMoney,
+  errorCharges: signedMoney.nullable().optional(),
+  netPayout: money,
+  source: z.string().trim().min(1).max(80),
+});
+
 export const DAILY_SALES_NUMERIC_COLUMNS = new Set([
   "grossSales",
   "netSales",
@@ -118,6 +141,21 @@ export const DOORDASH_WEEKLY_NUMERIC_COLUMNS = new Set([
   "pickupSubtotal",
   "deliveryGross",
   "pickupGross",
+]);
+
+export const UBEREATS_WEEKLY_NUMERIC_COLUMNS = new Set([
+  "subtotal",
+  "tax",
+  "gross",
+  "orderCount",
+  "deliveryOrders",
+  "pickupOrders",
+  "commission",
+  "marketingFees",
+  "promoFees",
+  "adjustments",
+  "errorCharges",
+  "netPayout",
 ]);
 
 export type NormalizedDailySale = {
@@ -160,6 +198,26 @@ export type NormalizedWeeklyReport = {
   pickupOrders: number | null;
   deliverySubtotal: number | null;
   pickupSubtotal: number | null;
+  source: string;
+};
+
+export type NormalizedUberEatsWeek = {
+  locationId: LocationId;
+  uberStoreId: string;
+  weekStart: string;
+  weekEnd: string;
+  subtotal: number;
+  tax: number;
+  gross: number;
+  orderCount: number;
+  deliveryOrders: number;
+  pickupOrders: number;
+  commission: number;
+  marketingFees: number;
+  promoFees: number;
+  adjustments: number;
+  errorCharges: number | null;
+  netPayout: number;
   source: string;
 };
 
@@ -240,6 +298,37 @@ export function parseDoorDashWeeklyBody(input: unknown): ParseResult<NormalizedW
   return { ok: true, records };
 }
 
+export function parseUberEatsWeeklyBody(input: unknown): ParseResult<NormalizedUberEatsWeek> {
+  const unwrapped = unwrapRecords(input);
+  if (!unwrapped.ok) return unwrapped;
+  const records: NormalizedUberEatsWeek[] = [];
+  const issues: string[] = [];
+  unwrapped.records.forEach((raw, index) => {
+    const parsed = uberEatsWeeklyRecordSchema.safeParse(raw);
+    if (!parsed.success) {
+      issues.push(`Record ${index + 1}: ${formatZod(parsed.error)}`);
+      return;
+    }
+    const reserved = reservedSource(parsed.data.source, index);
+    if (reserved) {
+      issues.push(reserved);
+      return;
+    }
+    const isolated = isolateUberWeekly(parsed.data, index);
+    if (!isolated.ok) {
+      issues.push(isolated.issue);
+      return;
+    }
+    records.push(isolated.record);
+  });
+  if (issues.length) return { ok: false, error: "Invalid Uber Eats weekly payload", issues };
+  const duplicate = duplicateKey(records.map((record) => `${record.locationId}|${record.weekStart}`));
+  if (duplicate) {
+    return { ok: false, error: "Duplicate location and week start in batch", issues: [duplicate] };
+  }
+  return { ok: true, records };
+}
+
 export async function upsertDailySales(records: NormalizedDailySale[]) {
   const importedAt = new Date();
   return prisma.$transaction(
@@ -260,6 +349,24 @@ export async function upsertDoorDashWeekly(records: NormalizedWeeklyReport[]) {
   return prisma.$transaction(
     records.map((record) =>
       prisma.doorDashWeeklyReport.upsert({
+        where: {
+          locationId_weekStart: {
+            locationId: record.locationId,
+            weekStart: record.weekStart,
+          },
+        },
+        create: { ...record, importedAt },
+        update: { ...record, importedAt },
+      }),
+    ),
+  );
+}
+
+export async function upsertUberEatsWeekly(records: NormalizedUberEatsWeek[]) {
+  const importedAt = new Date();
+  return prisma.$transaction(
+    records.map((record) =>
+      prisma.uberEatsWeeklyReport.upsert({
         where: {
           locationId_weekStart: {
             locationId: record.locationId,
@@ -361,6 +468,54 @@ function isolateWeekly(
       pickupOrders: data.pickupOrders ?? null,
       deliverySubtotal: data.deliverySubtotal ?? data.deliveryGross ?? null,
       pickupSubtotal: data.pickupSubtotal ?? data.pickupGross ?? null,
+      source: data.source,
+    },
+  };
+}
+
+function isolateUberWeekly(
+  data: z.infer<typeof uberEatsWeeklyRecordSchema>,
+  index: number,
+): { ok: true; record: NormalizedUberEatsWeek } | { ok: false; issue: string } {
+  const span = daysBetween(data.weekStart, data.weekEnd);
+  if (span !== 6) {
+    return {
+      ok: false,
+      issue: `Record ${index + 1}: weekEnd must be 6 days after weekStart (a 7-day week).`,
+    };
+  }
+  const owner = locationForUberStore(data.uberStoreId);
+  if (!owner) {
+    return {
+      ok: false,
+      issue: `Record ${index + 1}: Uber Eats store ${data.uberStoreId} is not a Chilakil store. Glendale is ${UBEREATS_STORE_IDS.glendale} and Avondale is ${UBEREATS_STORE_IDS.avondale}.`,
+    };
+  }
+  if (owner !== data.location) {
+    return {
+      ok: false,
+      issue: `Record ${index + 1}: Uber Eats store ${data.uberStoreId} belongs to ${owner}, not ${data.location}. Refusing to write across locations.`,
+    };
+  }
+  return {
+    ok: true,
+    record: {
+      locationId: data.location,
+      uberStoreId: UBEREATS_STORE_IDS[owner],
+      weekStart: data.weekStart,
+      weekEnd: data.weekEnd,
+      subtotal: round2(data.subtotal),
+      tax: round2(data.tax),
+      gross: round2(data.gross),
+      orderCount: data.orderCount,
+      deliveryOrders: data.deliveryOrders,
+      pickupOrders: data.pickupOrders,
+      commission: round2(data.commission),
+      marketingFees: round2(data.marketingFees),
+      promoFees: round2(data.promoFees),
+      adjustments: round2(data.adjustments),
+      errorCharges: data.errorCharges == null ? null : round2(data.errorCharges),
+      netPayout: round2(data.netPayout),
       source: data.source,
     },
   };

@@ -49,6 +49,7 @@ model Location {
   alerts                Alert[]
   dailySalesRecords     DailySalesRecord[]
   doorDashWeeklyReports DoorDashWeeklyReport[]
+  uberEatsWeeklyReports UberEatsWeeklyReport[]
   pricingReports        DoorDashPricingReport[]
 }
 
@@ -349,6 +350,37 @@ model DoorDashWeeklyReport {
   pickupSubtotal         Float?
   source                 String
   importedAt             DateTime @default(now())
+
+  @@unique([locationId, weekStart])
+  @@index([locationId, weekStart])
+}
+
+/// One Uber Eats merchant week for a single location.
+/// Glendale store 91bb8a8e-e9c5-5c0d-88a0-671cb75faf20.
+/// Avondale store a4232345-3850-5bb6-92bf-27434a445d64 (Uber may label this store Phoenix).
+/// Idempotent on location + week start.
+/// Statement deductions keep their sign. errorCharges stays null when the statement has none.
+model UberEatsWeeklyReport {
+  id             String   @id @default(cuid())
+  locationId     String
+  location       Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  uberStoreId    String
+  weekStart      String // YYYY-MM-DD
+  weekEnd        String // YYYY-MM-DD, inclusive
+  subtotal       Float
+  tax            Float
+  gross          Float
+  orderCount     Int
+  deliveryOrders Int
+  pickupOrders   Int
+  commission     Float
+  marketingFees  Float
+  promoFees      Float
+  adjustments    Float
+  errorCharges   Float?
+  netPayout      Float
+  source         String
+  importedAt     DateTime @default(now())
 
   @@unique([locationId, weekStart])
   @@index([locationId, weekStart])
