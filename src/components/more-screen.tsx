@@ -57,7 +57,8 @@ export function MoreScreen({ name, scope }: { name: string; scope: LocationScope
               {section.hrefs.map((href, index) => {
                 const mod = byHref.get(href);
                 if (!mod) return null;
-                return <ModuleTile key={href} mod={mod} styleIndex={index} />;
+                const span = index === section.hrefs.length - 1 && section.hrefs.length % 2 === 1;
+                return <ModuleTile key={href} mod={mod} styleIndex={index} wide={span} />;
               })}
             </div>
           </section>
@@ -114,7 +115,7 @@ function ModuleTile({
     <Link
       href={mod.href}
       className={`flex justify-between rounded-[1.35rem] border p-4 shadow-[0_12px_32px_-20px_rgba(0,0,0,0.28)] ${style.card} ${
-        wide ? "min-h-24 flex-row items-center gap-4" : "min-h-[108px] flex-col"
+        wide ? "col-span-2 min-h-24 flex-row items-center gap-4" : "min-h-[108px] flex-col"
       }`}
     >
       <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${style.badge}`}>
