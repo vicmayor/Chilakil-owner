@@ -1,6 +1,7 @@
+import { SyncHoursButton } from "@/components/sync-hours-button";
 import { TopBar } from "@/components/top-bar";
 import { Card, LocationDot, Metric } from "@/components/ui";
-import { formatPhoenixDateTime } from "@/lib/dates";
+import { formatPhoenixDateTime, formatShortDate, formatTime } from "@/lib/dates";
 import type { EmployeeHoursView, LocationHoursBlock } from "@/lib/employee-hours";
 import { moneyExact, pct } from "@/lib/format";
 import type { LocationScope } from "@/lib/location";
@@ -8,38 +9,55 @@ import type { LocationScope } from "@/lib/location";
 export function EmployeeHoursScreen({
   view,
   scope,
+  connected,
 }: {
   view: EmployeeHoursView;
   scope: LocationScope;
+  connected: boolean;
 }) {
   return (
     <>
-      <TopBar title="Employees" subtitle="Pay period hours and base pay by location" scope={scope} />
+      <TopBar title="Employees" subtitle="Pay period hours by location" scope={scope} />
       <main className="space-y-4 px-4 py-4">
         <p className="text-sm text-muted">
-          Base pay excludes overtime, tips, and taxes. Labor % is that location&apos;s base pay divided by
-          its Square sales for the same dates.
+          Gross pay estimate excludes overtime, tips, and taxes. Labor % is that location&apos;s estimate
+          divided by its Square sales for the same dates. Hours are read-only.
         </p>
+        {connected ? (
+          <SyncHoursButton />
+        ) : (
+          <Card>
+            <p className="text-base font-medium">Not connected</p>
+            <p className="mt-1 text-sm text-muted">
+              Set CHILAKIL_TEAM_API_URL and CHILAKIL_TEAM_API_TOKEN to pull hours from the team site.
+            </p>
+          </Card>
+        )}
         <p className="text-sm text-muted">
           {view.latestSyncedAt
             ? `Last synced ${formatPhoenixDateTime(new Date(view.latestSyncedAt))}`
-            : "No pay periods synced yet"}
+            : connected
+              ? "No pay periods synced yet"
+              : "No hours on file"}
         </p>
 
         {view.periods.length === 0 ? (
-          <Card>
-            <p className="text-base font-medium">No employee hours yet.</p>
-            <p className="mt-1 text-sm text-muted">
-              Hours come from the team site pay periods summary. Glendale and Avondale stay in separate
-              blocks.
-            </p>
-          </Card>
+          connected ? (
+            <Card>
+              <p className="text-base font-medium">No employee hours yet.</p>
+              <p className="mt-1 text-sm text-muted">
+                Sync now pulls Sunday–Saturday pay periods. Glendale and Avondale stay in separate blocks.
+              </p>
+            </Card>
+          ) : null
         ) : (
           view.periods.map((period) => (
             <section key={`${period.periodStart}|${period.periodEnd}`} className="space-y-3">
               <div>
-                <h2 className="text-sm font-semibold">Pay period {formatPayPeriod(period.periodStart, period.periodEnd)}</h2>
-                <p className="text-xs text-muted">Each location is listed on its own.</p>
+                <h2 className="text-sm font-semibold">
+                  Pay period {formatPayPeriod(period.periodStart, period.periodEnd)}
+                </h2>
+                <p className="text-xs text-muted">Sunday–Saturday · each location is listed on its own.</p>
               </div>
               {period.locations.map((block) => (
                 <LocationBlock key={block.locationId} block={block} />
@@ -66,7 +84,11 @@ function LocationBlock({ block }: { block: LocationHoursBlock }) {
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-4">
         <Metric label="Hours" value={formatHourCount(block.hours)} hint="hours" />
-        <Metric label="Base pay" value={moneyExact(block.basePay)} hint="Excludes OT, tips, taxes" />
+        <Metric
+          label="Gross pay estimate"
+          value={moneyExact(block.grossPayEstimate)}
+          hint="Excludes OT, tips, taxes"
+        />
       </div>
       <div className="mt-4">
         <Metric
@@ -77,15 +99,36 @@ function LocationBlock({ block }: { block: LocationHoursBlock }) {
       </div>
       <ul className="mt-3 divide-y divide-line">
         {block.employees.map((employee) => (
-          <li key={employee.employeeName} className="flex items-start justify-between gap-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium">{employee.employeeName}</p>
-              <p className="text-xs text-muted">
-                {formatHourCount(employee.hours)} hrs · {moneyExact(employee.hourlyRate)}/hr ·{" "}
-                {employee.status === "approved" ? "Approved" : "Pending review"}
-              </p>
+          <li key={employee.employeeId} className="py-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{employee.employeeName}</p>
+                <p className="text-xs text-muted">
+                  {formatHourCount(employee.hours)} hrs · {moneyExact(employee.hourlyRate)}/hr ·{" "}
+                  {employee.status === "approved" ? "Approved" : "Pending review"}
+                </p>
+              </div>
+              <p className="tabular text-sm font-semibold">{moneyExact(employee.grossPayEstimate)}</p>
             </div>
-            <p className="tabular text-sm font-semibold">{moneyExact(employee.basePay)}</p>
+            {employee.days.length > 0 ? (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs font-semibold text-muted">Punches</summary>
+                <ul className="mt-1 space-y-1">
+                  {employee.days.map((day) => (
+                    <li key={day.date} className="text-xs text-muted">
+                      <span className="font-medium text-ink">{formatShortDate(day.date)}</span>
+                      {" · "}
+                      {formatPunch(day.clockIn)}–{formatPunch(day.clockOut)}
+                      {" · "}
+                      {formatHourCount(day.hours)} hrs
+                      {day.breaks.length > 0
+                        ? ` · Break ${day.breaks.map((brk) => `${formatPunch(brk.start)}–${formatPunch(brk.end)}`).join(", ")}`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -119,6 +162,14 @@ function squareSalesHint(block: LocationHoursBlock): string {
 
 function formatHourCount(hours: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(hours);
+}
+
+function formatPunch(value: string | null): string {
+  if (!value) return "—";
+  if (/^\d{2}:\d{2}/.test(value) && !value.includes("T")) return value.slice(0, 5);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return formatTime(parsed);
 }
 
 function formatPayPeriod(start: string, end: string): string {

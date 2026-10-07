@@ -7,18 +7,33 @@ import {
   type LocationId,
   type LocationScope,
 } from "@/lib/location";
-import type { EmployeeHoursStatus } from "@/lib/ingest";
+import type { TeamHoursStatus } from "@/lib/team-hours-mapper";
+
+export type EmployeeHoursBreak = {
+  start: string;
+  end: string;
+};
+
+export type EmployeeHoursDay = {
+  date: string;
+  clockIn: string | null;
+  clockOut: string | null;
+  hours: number;
+  breaks: EmployeeHoursBreak[];
+};
 
 export type EmployeeHoursRow = {
   locationId: LocationId;
   periodStart: string;
   periodEnd: string;
+  employeeId: string;
   employeeName: string;
-  hours: number;
   hourlyRate: number;
-  basePay: number;
-  status: EmployeeHoursStatus;
+  totalHours: number;
+  grossPayEstimate: number;
+  status: TeamHoursStatus;
   syncedAt?: string;
+  days: EmployeeHoursDay[];
 };
 
 export type SquareSalesDay = {
@@ -28,21 +43,23 @@ export type SquareSalesDay = {
 };
 
 export type EmployeeHoursLine = {
+  employeeId: string;
   employeeName: string;
   hours: number;
   hourlyRate: number;
-  basePay: number;
-  status: EmployeeHoursStatus;
+  grossPayEstimate: number;
+  status: TeamHoursStatus;
+  days: EmployeeHoursDay[];
 };
 
 export type LocationHoursBlock = {
   locationId: LocationId;
   hours: number;
-  basePay: number;
+  grossPayEstimate: number;
   squareSales: number;
   salesDaysOnFile: number;
   periodDays: number;
-  /** Base pay divided by this location's Square gross. Null when sales are zero. */
+  /** Gross pay estimate divided by this location's Square gross. Null when sales are zero. */
   laborPct: number | null;
   review: "pending" | "approved" | "mixed";
   pendingCount: number;
@@ -64,7 +81,7 @@ export type EmployeeHoursView = {
 /**
  * Pay periods for the location switcher.
  * ALL returns one labeled block per location that has rows. It does not add
- * hours, base pay, or labor % across Glendale and Avondale.
+ * hours, gross pay, or labor % across Glendale and Avondale.
  * Labor % uses that location's Square gross (daily sales) on the pay-period dates.
  */
 export function buildEmployeeHoursView(
@@ -90,10 +107,10 @@ export function buildEmployeeHoursView(
       const locations = LOCATION_IDS.filter((id) => allowed.has(id)).flatMap((locationId) => {
         const employees = periodRows
           .filter((row) => row.locationId === locationId)
-          .sort((a, b) => a.employeeName.localeCompare(b.employeeName, "en"));
+          .sort((a, b) => a.employeeName.localeCompare(b.employeeName, "en") || a.employeeId.localeCompare(b.employeeId));
         if (employees.length === 0) return [];
-        const hours = round2(employees.reduce((sum, row) => sum + row.hours, 0));
-        const basePay = round2(employees.reduce((sum, row) => sum + row.basePay, 0));
+        const hours = round2(employees.reduce((sum, row) => sum + row.totalHours, 0));
+        const grossPayEstimate = round2(employees.reduce((sum, row) => sum + row.grossPayEstimate, 0));
         const salesByDate = new Map<string, number>();
         for (const day of sales) {
           if (day.locationId !== locationId) continue;
@@ -106,20 +123,22 @@ export function buildEmployeeHoursView(
         const block: LocationHoursBlock = {
           locationId,
           hours,
-          basePay,
+          grossPayEstimate,
           squareSales,
           salesDaysOnFile: salesByDate.size,
           periodDays: inclusiveIsoDays(periodStart, periodEnd),
-          laborPct: squareSales > 0 ? basePay / squareSales : null,
+          laborPct: squareSales > 0 ? grossPayEstimate / squareSales : null,
           review: pendingCount === 0 ? "approved" : approvedCount === 0 ? "pending" : "mixed",
           pendingCount,
           approvedCount,
           employees: employees.map((row) => ({
+            employeeId: row.employeeId,
             employeeName: row.employeeName,
-            hours: row.hours,
+            hours: row.totalHours,
             hourlyRate: row.hourlyRate,
-            basePay: row.basePay,
+            grossPayEstimate: row.grossPayEstimate,
             status: row.status,
+            days: row.days,
           })),
         };
         return [block];
@@ -140,6 +159,12 @@ export async function loadEmployeeHoursView(scope: LocationScope): Promise<Emplo
   const ids = locationIdsForScope(scope);
   const rows = await prisma.employeeHoursPeriod.findMany({
     where: { locationId: { in: ids } },
+    include: {
+      days: {
+        orderBy: { date: "asc" },
+        include: { breaks: { orderBy: { sortOrder: "asc" } } },
+      },
+    },
   });
   if (rows.length === 0) return buildEmployeeHoursView([], [], scope);
 
@@ -167,12 +192,20 @@ export async function loadEmployeeHoursView(scope: LocationScope): Promise<Emplo
           locationId: row.locationId,
           periodStart: row.periodStart,
           periodEnd: row.periodEnd,
+          employeeId: row.employeeId,
           employeeName: row.employeeName,
-          hours: decimalToNumber(row.hours),
           hourlyRate: decimalToNumber(row.hourlyRate),
-          basePay: decimalToNumber(row.basePay),
+          totalHours: decimalToNumber(row.totalHours),
+          grossPayEstimate: decimalToNumber(row.grossPayEstimate),
           status: row.status,
           syncedAt: row.syncedAt.toISOString(),
+          days: row.days.map((day) => ({
+            date: day.date,
+            clockIn: day.clockIn,
+            clockOut: day.clockOut,
+            hours: decimalToNumber(day.hours),
+            breaks: day.breaks.map((brk) => ({ start: brk.start, end: brk.end })),
+          })),
         },
       ];
     }),
