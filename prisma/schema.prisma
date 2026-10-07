@@ -43,8 +43,9 @@ model Location {
   messages           CustomerMessage[]
   reviews            Review[]
   campaigns          MarketingCampaign[]
-  employees          Employee[]
-  shifts             Shift[]
+  employees             Employee[]
+  shifts                Shift[]
+  employeeHoursPeriods  EmployeeHoursPeriod[]
   integrations          IntegrationConfig[]
   alerts                Alert[]
   dailySalesRecords     DailySalesRecord[]
@@ -291,6 +292,61 @@ model Shift {
   hours      Float
   laborCost  Float
   role       String
+}
+
+enum EmployeeHoursStatus {
+  pending
+  approved
+}
+
+/// One employee at one location for one Sunday–Saturday pay period.
+/// Pulled from the Chilakil Team API. Keyed by employee id, so the same
+/// person can have a row at Glendale and a row at Avondale.
+/// Dates are America/Phoenix calendar days. This app does not edit or approve these rows.
+model EmployeeHoursPeriod {
+  id               String              @id @default(cuid())
+  locationId       String
+  location         Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  periodStart      String
+  periodEnd        String
+  employeeId       String
+  employeeName     String
+  hourlyRate       Decimal             @db.Decimal(10, 2)
+  totalHours       Decimal             @db.Decimal(10, 2)
+  grossPayEstimate Decimal             @db.Decimal(10, 2)
+  status           EmployeeHoursStatus
+  syncedAt         DateTime            @default(now())
+  days             EmployeeHoursDay[]
+
+  @@unique([locationId, periodStart, employeeId])
+  @@index([locationId, periodStart])
+}
+
+/// One day's punches for an employee hours period. clockIn and clockOut stay
+/// as the team API sent them.
+model EmployeeHoursDay {
+  id       String              @id @default(cuid())
+  periodId String
+  period   EmployeeHoursPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  date     String
+  clockIn  String?
+  clockOut String?
+  hours    Decimal             @db.Decimal(10, 2)
+  breaks   EmployeeHoursBreak[]
+
+  @@unique([periodId, date])
+  @@index([periodId, date])
+}
+
+model EmployeeHoursBreak {
+  id        String           @id @default(cuid())
+  dayId     String
+  day       EmployeeHoursDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  start     String
+  end       String
+  sortOrder Int              @default(0)
+
+  @@index([dayId, sortOrder])
 }
 
 /// Stores secret *references* (env var names), never secret values.

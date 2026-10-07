@@ -117,6 +117,22 @@ npm run ingest -- ubereats-weekly examples/ubereats-weekly.json
 
 Example files live in `examples/`. `source` cannot be `sample` on these endpoints; that value is only for the local demo seed.
 
+## Employee hours
+
+The Employees screen pulls Sunday–Saturday pay periods from the Chilakil Team API. It does not edit or approve hours. Set both `CHILAKIL_TEAM_API_URL` and `CHILAKIL_TEAM_API_TOKEN`. If either is missing, the screen says **Not connected** and Sync now is hidden.
+
+Sync now, and `GET` or `POST /api/sync/employee-hours`, read:
+
+`GET {CHILAKIL_TEAM_API_URL}/api/v1/hours?periodStart=YYYY-MM-DD&location=glendale|avondale|all`
+
+with `Authorization: Bearer $CHILAKIL_TEAM_API_TOKEN`. The sync asks for `location=all` for the current Phoenix week and the previous seven weeks. `periodStart` is the Sunday. Rows are stored per employee id, location, and period, with each day’s clock in, clock out, and breaks. Those times are either `HH:MM` or an ISO timestamp with an offset, such as `2026-10-04T07:58:00-07:00`, and are stored as sent. The same employee id may have a row at both locations. ALL shows those locations as separate labeled blocks. Labor % is that location’s gross pay estimate divided by its Square gross for the same dates. The estimate excludes overtime, tips, and taxes.
+
+The sync route is for cron. It accepts `Authorization: Bearer $CRON_SECRET` or `Authorization: Bearer $INGEST_TOKEN`. It does not use the team token as its own password.
+
+```bash
+curl -X POST -H "Authorization: Bearer $INGEST_TOKEN" "$APP_URL/api/sync/employee-hours"
+```
+
 ## Food cost workbook
 
 The Food Cost screen reads `Ingredient`, `Recipe`, `RecipeIngredient`, and `MenuItem` rows imported from `data/chilakil-to-go-food-cost.xlsx` (Ingredient Prices, Recipe Costing, and Menu Summary). The workbook is shared pricing, so the seed copies it onto both Glendale and Avondale. Blank purchase costs stay blank. The importer does not fill Al Pastor, Chicken, or any other empty price.
@@ -143,7 +159,7 @@ Bottom tabs: **Home · Sales · Inbox · Ask · More**. More opens the full grid
 9. Customer Messages — EN/ES chrome; sensitive types require owner Approve / Edit / Reject
 10. Reviews
 11. Marketing
-12. Employees
+12. Employees — pay-period hours pulled from the team API, gross pay estimate, and labor % of that location’s Square sales
 13. AI Assistant — queries seeded data; respects the location filter
 
 ## Customer messages (approval gate)
@@ -172,6 +188,7 @@ It never invents live platform API results. The snapshot `source` field says so.
 - `FoodCostProfile` — per-location workbook target (30%) and costing caveat
 - `CustomerMessage` — `language` `en|es`, sensitivity flags, draft/approved reply
 - `Review`, `MarketingCampaign`, `Employee`, `Shift`
+- `EmployeeHoursPeriod`, `EmployeeHoursDay`, `EmployeeHoursBreak` — one employee’s Sunday–Saturday hours for one location, keyed by employee id, with daily punches and breaks. Status is `pending` or `approved`. Read-only in this app.
 - `IntegrationConfig` — `secretRef` env var name only
 - `Alert`, `AiThread`, `AiMessage`, `User`
 
@@ -190,7 +207,7 @@ Today’s seeded shape (Phoenix “today”, not a fixed calendar date):
 
 ## Env vars
 
-See `.env.example`. Required: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `INGEST_TOKEN`, `OWNER_EMAIL`, `OWNER_PASSWORD`. Optional: `OPENAI_API_KEY`, `APP_URL`, `OWNER_NAME`, `SEED_SAMPLE`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
+See `.env.example`. Required: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `INGEST_TOKEN`, `OWNER_EMAIL`, `OWNER_PASSWORD`. Optional: `OPENAI_API_KEY`, `APP_URL`, `OWNER_NAME`, `SEED_SAMPLE`, `CRON_SECRET`, `CHILAKIL_TEAM_API_URL`, `CHILAKIL_TEAM_API_TOKEN`. Future per-location placeholders: `DOORDASH_*`, `UBEREATS_*`, `GRUBHUB_*`, `SQUARE_*`, `META_*`, `BANKING_*`.
 
 `DailySales` is still the channel-level sample mix. Imported days live in `DailySalesRecord` (unique on location + Phoenix date). DoorDash merchant weeks live in `DoorDashWeeklyReport` and Uber Eats merchant weeks live in `UberEatsWeeklyReport` (each unique on location + week start). The dashboard uses `DailySalesRecord` for today when a row exists.
 

@@ -1,0 +1,68 @@
+{
+  "periodStart": "2026-09-27",
+  "periodEnd": "2026-10-03",
+  "timezone": "America/Phoenix",
+  "employees": [
+    {
+      "employeeId": "emp_maria",
+      "name": "Maria Lopez",
+      "location": "glendale",
+      "hourlyRate": 18,
+      "status": "pending",
+      "totalHours": 12.5,
+      "grossPayEstimate": 225,
+      "days": [
+        {
+          "date": "2026-09-27",
+          "clockIn": "08:00",
+          "clockOut": "16:30",
+          "breaks": [{ "start": "12:00", "end": "12:30" }],
+          "hours": 8
+        },
+        {
+          "date": "2026-09-28",
+          "clockIn": "09:00",
+          "clockOut": null,
+          "breaks": [],
+          "hours": 4.5
+        }
+      ]
+    },
+    {
+      "employeeId": "emp_maria",
+      "name": "Maria Lopez",
+      "location": "avondale",
+      "hourlyRate": 18,
+      "status": "approved",
+      "totalHours": 6,
+      "grossPayEstimate": 108,
+      "days": [
+        {
+          "date": "2026-09-27",
+          "clockIn": "10:00",
+          "clockOut": "16:00",
+          "breaks": [{ "start": "13:00", "end": "13:15" }, { "start": "15:00", "end": "15:10" }],
+          "hours": 6
+        }
+      ]
+    },
+    {
+      "employeeId": "emp_luis",
+      "name": "Luis Vega",
+      "location": "glendale",
+      "hourlyRate": 17,
+      "status": "approved",
+      "totalHours": 4,
+      "grossPayEstimate": 68,
+      "days": [
+        {
+          "date": "2026-10-03",
+          "clockIn": "11:00",
+          "clockOut": "15:00",
+          "breaks": [],
+          "hours": 4
+        }
+      ]
+    }
+  ]
+}

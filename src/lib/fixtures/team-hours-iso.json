@@ -1,0 +1,48 @@
+{
+  "periodStart": "2026-10-04",
+  "periodEnd": "2026-10-10",
+  "timezone": "America/Phoenix",
+  "employees": [
+    {
+      "employeeId": "emp_maria",
+      "name": "Maria Lopez",
+      "location": "glendale",
+      "hourlyRate": 18,
+      "status": "pending",
+      "totalHours": 8,
+      "grossPayEstimate": 144,
+      "days": [
+        {
+          "date": "2026-10-04",
+          "clockIn": "2026-10-04T07:58:00-07:00",
+          "clockOut": "2026-10-04T16:05:00-07:00",
+          "breaks": [
+            {
+              "start": "2026-10-04T12:00:00-07:00",
+              "end": "2026-10-04T12:30:00-07:00"
+            }
+          ],
+          "hours": 8
+        }
+      ]
+    },
+    {
+      "employeeId": "emp_luis",
+      "name": "Luis Vega",
+      "location": "avondale",
+      "hourlyRate": 17,
+      "status": "approved",
+      "totalHours": 4,
+      "grossPayEstimate": 68,
+      "days": [
+        {
+          "date": "2026-10-05",
+          "clockIn": "2026-10-05T11:00:00.000-07:00",
+          "clockOut": "2026-10-05T15:00:00Z",
+          "breaks": [],
+          "hours": 4
+        }
+      ]
+    }
+  ]
+}

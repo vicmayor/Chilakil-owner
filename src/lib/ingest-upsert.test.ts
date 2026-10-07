@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { prisma } from "./db";
 import { DOORDASH_STORE_IDS } from "./doordash-stores";
 import { UBEREATS_STORE_IDS } from "./ubereats-stores";
+import { loadEmployeeHoursView } from "./employee-hours";
 import {
   parseDailySalesBody,
   parseDoorDashWeeklyBody,
@@ -14,6 +15,10 @@ import {
 import { POST as postDaily } from "../app/api/ingest/daily-sales/route";
 import { POST as postWeekly } from "../app/api/ingest/doordash-weekly/route";
 import { POST as postUberWeekly } from "../app/api/ingest/ubereats-weekly/route";
+import { GET as getEmployeeHoursSync } from "../app/api/sync/employee-hours/route";
+import { phoenixSunday, shiftIsoDate } from "./dates";
+import { syncTeamHours } from "./team-hours-sync";
+import type { TeamHoursClient } from "./team-hours-client";
 
 const DATES = ["2099-01-05", "2099-01-06"];
 const WEEK_START = "2099-01-05";
@@ -58,10 +63,17 @@ before(async () => {
   });
 });
 
+const HOURS_START = phoenixSunday("2099-06-15");
+const HOURS_END = shiftIsoDate(HOURS_START, 6);
+
 async function cleanup() {
   await prisma.dailySalesRecord.deleteMany({ where: { date: { in: DATES }, source: { in: ["upsert-test", "square-export"] } } });
   await prisma.doorDashWeeklyReport.deleteMany({ where: { weekStart: WEEK_START } });
   await prisma.uberEatsWeeklyReport.deleteMany({ where: { weekStart: UBER_WEEK_START } });
+  await prisma.employeeHoursPeriod.deleteMany({ where: { employeeId: { startsWith: "emp-sync-" } } });
+  await prisma.dailySalesRecord.deleteMany({
+    where: { date: { gte: HOURS_START, lte: HOURS_END }, source: "upsert-test" },
+  });
 }
 
 test("daily sales upsert is idempotent and does not write the other location", async () => {
@@ -276,6 +288,150 @@ test("Uber Eats weekly rejects a missing bearer token and a sample source withou
   assert.equal(sample.status, 400);
   const count = await prisma.uberEatsWeeklyReport.count({ where: { weekStart: UBER_WEEK_START } });
   assert.equal(count, 0);
+});
+
+function teamPayload(totalHours: number) {
+  return {
+    periodStart: HOURS_START,
+    periodEnd: HOURS_END,
+    timezone: "America/Phoenix",
+    employees: [
+      {
+        employeeId: "emp-sync-ana",
+        name: "Ana Ruiz",
+        location: "glendale",
+        hourlyRate: 16,
+        status: "pending",
+        totalHours,
+        grossPayEstimate: 100,
+        days: [
+          {
+            date: HOURS_START,
+            clockIn: "08:00",
+            clockOut: "16:00",
+            breaks: [{ start: "12:00", end: "12:30" }],
+            hours: totalHours,
+          },
+        ],
+      },
+      {
+        employeeId: "emp-sync-ana",
+        name: "Ana Ruiz",
+        location: "avondale",
+        hourlyRate: 16,
+        status: "approved",
+        totalHours: 4,
+        grossPayEstimate: 40,
+        days: [
+          {
+            date: shiftIsoDate(HOURS_START, 1),
+            clockIn: "10:00",
+            clockOut: null,
+            breaks: [],
+            hours: 4,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+test("team hours sync stores punches by employee id and keeps both locations", async () => {
+  await cleanup();
+  const client: TeamHoursClient = {
+    async fetchHours() {
+      return teamPayload(10);
+    },
+  };
+  const first = await syncTeamHours({ client, periodStarts: [HOURS_START], location: "all" });
+  assert.equal(first.ok, true);
+  assert.equal(first.upserted, 2);
+
+  const updated: TeamHoursClient = {
+    async fetchHours() {
+      return teamPayload(12);
+    },
+  };
+  await syncTeamHours({ client: updated, periodStarts: [HOURS_START], location: "all" });
+
+  const rows = await prisma.employeeHoursPeriod.findMany({
+    where: { employeeId: "emp-sync-ana", periodStart: HOURS_START },
+    orderBy: { locationId: "asc" },
+    include: { days: { include: { breaks: true } } },
+  });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].locationId, "avondale");
+  assert.equal(rows[0].totalHours.toNumber(), 4);
+  assert.equal(rows[0].status, "approved");
+  assert.equal(rows[0].days[0].clockOut, null);
+  assert.equal(rows[1].locationId, "glendale");
+  assert.equal(rows[1].totalHours.toNumber(), 12);
+  assert.equal(rows[1].grossPayEstimate.toNumber(), 100);
+  assert.equal(rows[1].days.length, 1);
+  assert.equal(rows[1].days[0].breaks.length, 1);
+  assert.equal(rows[1].days[0].breaks[0].start, "12:00");
+
+  const glendaleOnlyClient: TeamHoursClient = {
+    async fetchHours() {
+      const payload = teamPayload(12);
+      return { ...payload, employees: payload.employees.filter((employee) => employee.location === "glendale") };
+    },
+  };
+  await syncTeamHours({ client: glendaleOnlyClient, periodStarts: [HOURS_START], location: "all" });
+  const afterDrop = await prisma.employeeHoursPeriod.count({
+    where: { employeeId: "emp-sync-ana", periodStart: HOURS_START, locationId: "avondale" },
+  });
+  assert.equal(afterDrop, 0);
+
+  const sales = parseDailySalesBody([
+    dailyBody("glendale", 500, HOURS_START),
+    dailyBody("avondale", 800, HOURS_START),
+  ]);
+  assert.equal(sales.ok, true);
+  if (!sales.ok) return;
+  await upsertDailySales(sales.records);
+
+  const all = await loadEmployeeHoursView("all");
+  const period = all.periods.find((item) => item.periodStart === HOURS_START);
+  assert.ok(period);
+  assert.deepEqual(
+    period.locations.map((block) => [block.locationId, block.grossPayEstimate, block.squareSales, block.laborPct]),
+    [["glendale", 100, 500, 0.2]],
+  );
+  const glendaleOnly = await loadEmployeeHoursView("glendale");
+  const glendalePeriod = glendaleOnly.periods.find((item) => item.periodStart === HOURS_START);
+  assert.equal(glendalePeriod?.locations.length, 1);
+  assert.equal(glendalePeriod?.locations[0].locationId, "glendale");
+});
+
+test("employee hours sync is unauthorized without a bearer token and not connected without team env", async () => {
+  process.env.INGEST_TOKEN = process.env.INGEST_TOKEN || "upsert-test-token";
+  await cleanup();
+  const previousUrl = process.env.CHILAKIL_TEAM_API_URL;
+  const previousToken = process.env.CHILAKIL_TEAM_API_TOKEN;
+  delete process.env.CHILAKIL_TEAM_API_URL;
+  delete process.env.CHILAKIL_TEAM_API_TOKEN;
+  try {
+    const unauthorized = await getEmployeeHoursSync(
+      new Request("http://localhost/api/sync/employee-hours"),
+    );
+    assert.equal(unauthorized.status, 401);
+
+    const missing = await getEmployeeHoursSync(
+      new Request("http://localhost/api/sync/employee-hours", {
+        headers: { authorization: `Bearer ${process.env.INGEST_TOKEN}` },
+      }),
+    );
+    assert.equal(missing.status, 200);
+    const body = (await missing.json()) as { connected: boolean };
+    assert.equal(body.connected, false);
+    assert.equal(await prisma.employeeHoursPeriod.count({ where: { employeeId: { startsWith: "emp-sync-" } } }), 0);
+  } finally {
+    if (previousUrl === undefined) delete process.env.CHILAKIL_TEAM_API_URL;
+    else process.env.CHILAKIL_TEAM_API_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.CHILAKIL_TEAM_API_TOKEN;
+    else process.env.CHILAKIL_TEAM_API_TOKEN = previousToken;
+  }
 });
 
 test("missing bearer token is unauthorized and does not write", async () => {

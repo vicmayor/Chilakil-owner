@@ -558,7 +558,7 @@ function reservedSource(source: string, index: number): string | null {
 function duplicateKey(keys: string[]): string | null {
   const seen = new Set<string>();
   for (const key of keys) {
-    if (seen.has(key)) return `Duplicate key ${key.replace("|", " / ")} in the same batch.`;
+    if (seen.has(key)) return `Duplicate key ${key.replaceAll("|", " / ")} in the same batch.`;
     seen.add(key);
   }
   return null;

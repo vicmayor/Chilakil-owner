@@ -18,6 +18,13 @@ export function phoenixMonday(iso: string): string {
   return shiftIsoDate(iso, delta);
 }
 
+/** Sunday of the Phoenix calendar week that contains `iso` (Sunday–Saturday). */
+export function phoenixSunday(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return shiftIsoDate(iso, -dow);
+}
+
 export function shiftIsoDate(iso: string, deltaDays: number): string {
   const [year, month, day] = iso.split("-").map(Number);
   const utc = Date.UTC(year, month - 1, day + deltaDays);
