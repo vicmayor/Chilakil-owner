@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { MAX_MONEY_INPUT } from "@/lib/food-cost";
 
-const money = z.number().finite().min(0).max(MAX_MONEY_INPUT);
+const moneyOrNull = z.union([z.null(), z.number().finite().min(0).max(MAX_MONEY_INPUT)]);
 
 const saveSchema = z
   .object({
@@ -15,7 +15,8 @@ const saveSchema = z
       .array(
         z.object({
           id: z.string().min(1).max(64),
-          costPerUnit: money,
+          costPerUnit: moneyOrNull,
+          addonPrice: moneyOrNull,
         }),
       )
       .max(300),
@@ -23,7 +24,7 @@ const saveSchema = z
       .array(
         z.object({
           id: z.string().min(1).max(64),
-          price: money,
+          price: moneyOrNull,
         }),
       )
       .max(300),
@@ -63,7 +64,7 @@ export async function saveFoodCostWorkbook(input: unknown): Promise<SaveFoodCost
       for (const row of ingredients) {
         const result = await tx.ingredient.updateMany({
           where: { id: row.id, locationId },
-          data: { costPerUnit: row.costPerUnit },
+          data: { costPerUnit: row.costPerUnit, addonPrice: row.addonPrice },
         });
         if (result.count !== 1) {
           throw new Error("INGREDIENT_SCOPE");

@@ -1,274 +1,178 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  PROTEIN_ADDON_PRICE,
-  TARGET_FOOD_COST_PCT,
-  costsDiffer,
-  groupFoodCostLocations,
-  roundMoney,
-  parseCostInput,
-  proteinAddonsForLocation,
-  quoteSale,
-  recipeCost,
-  type FoodCostIngredient,
-  type FoodCostMenuItem,
-} from "./food-cost";
+import { buildFoodCostReport, withFoodCostEdits } from "./food-cost";
+import { loadFoodCostWorkbook } from "./food-cost-workbook";
 
-/**
- * Unit costs and plate quantities copied from prisma/seed.ts.
- * Glendale and Avondale are separate rows there; these fixtures stay separate too.
- */
-const GLENDALE_COSTS: Record<string, number> = {
-  "Carne asada": 8.4,
-  "Pastor pork": 5.1,
-  "Chicken thigh": 3.8,
-  "Corn tortillas": 0.08,
-  "Flour tortillas": 0.18,
-  "Oaxaca cheese": 6.2,
-  "Cabbage / onion mix": 1.4,
-  "Salsa roja": 0.12,
-  Rice: 0.06,
-  Beans: 0.07,
-  "Horchata mix": 0.09,
-  Clamshell: 0.22,
-};
+const workbook = loadFoodCostWorkbook();
+const report = buildFoodCostReport(workbook);
 
-const AVONDALE_COSTS: Record<string, number> = {
-  "Carne asada": 8.7,
-  "Pastor pork": 5.3,
-  "Chicken thigh": 4,
-  "Corn tortillas": 0.09,
-  "Flour tortillas": 0.2,
-  "Oaxaca cheese": 6.4,
-  "Cabbage / onion mix": 1.5,
-  "Salsa roja": 0.13,
-  Rice: 0.07,
-  Beans: 0.08,
-  "Horchata mix": 0.1,
-  Clamshell: 0.22,
-};
+function close(actual: number | null, expected: number) {
+  assert.notEqual(actual, null);
+  assert.ok(Math.abs((actual ?? 0) - expected) < 1e-9, `${actual} !== ${expected}`);
+}
 
-const PLATES: {
-  name: string;
-  category: string;
-  price: number;
-  lines: [string, number][];
-}[] = [
-  {
-    name: "Tacos al pastor (3)",
-    category: "Tacos",
-    price: 13.5,
-    lines: [
-      ["Pastor pork", 0.35],
-      ["Corn tortillas", 3],
-      ["Cabbage / onion mix", 0.12],
-      ["Salsa roja", 2],
-      ["Clamshell", 1],
-    ],
-  },
-  {
-    name: "Carne asada tacos (3)",
-    category: "Tacos",
-    price: 14.5,
-    lines: [
-      ["Carne asada", 0.38],
-      ["Corn tortillas", 3],
-      ["Cabbage / onion mix", 0.12],
-      ["Salsa roja", 2],
-      ["Clamshell", 1],
-    ],
-  },
-  {
-    name: "Burrito Chilakil",
-    category: "Burritos",
-    price: 14,
-    lines: [
-      ["Carne asada", 0.3],
-      ["Flour tortillas", 1],
-      ["Rice", 5],
-      ["Beans", 4],
-      ["Oaxaca cheese", 0.12],
-      ["Salsa roja", 2],
-      ["Clamshell", 1],
-    ],
-  },
-  {
-    name: "Chicken tinga quesadilla",
-    category: "Quesadillas",
-    price: 12,
-    lines: [
-      ["Chicken thigh", 0.28],
-      ["Flour tortillas", 1],
-      ["Oaxaca cheese", 0.18],
-      ["Salsa roja", 1.5],
-      ["Clamshell", 1],
-    ],
-  },
-  {
-    name: "Horchata 16oz",
-    category: "Drinks",
-    price: 3.75,
-    lines: [["Horchata mix", 16]],
-  },
-];
+function item(name: string) {
+  const found = report.menu.find((row) => row.name === name);
+  assert.ok(found, name);
+  return found;
+}
 
-function kitchen(locationId: "glendale" | "avondale", costs: Record<string, number>) {
-  const ingredients: (FoodCostIngredient & { locationId: "glendale" | "avondale" })[] = Object.entries(
-    costs,
-  ).map(([name, costPerUnit]) => ({
-    id: `${locationId}:${name}`,
-    locationId,
-    name,
-    unit: name.includes("tortilla") || name === "Clamshell" ? "each" : name === "Salsa roja" || name.includes("mix") || name === "Rice" || name === "Beans" ? "oz" : "lb",
-    costPerUnit,
-  }));
-  const items: (FoodCostMenuItem & { locationId: "glendale" | "avondale" })[] = PLATES.map((plate) => ({
-    id: `${locationId}:${plate.name}`,
-    locationId,
-    name: plate.name,
-    category: plate.category,
-    price: locationId === "avondale" && plate.category !== "Drinks" ? plate.price - 0.5 : plate.price,
-    lines: plate.lines.map(([name, quantity]) => {
-      const ingredient = ingredients.find((entry) => entry.name === name);
-      if (!ingredient) throw new Error(`missing ${name}`);
-      return {
-        ingredientId: ingredient.id,
-        name,
-        unit: ingredient.unit,
-        quantity,
-      };
+test("workbook keys stay unique and stable", () => {
+  const again = loadFoodCostWorkbook();
+  const ingredientKeys = workbook.ingredients.map((row) => row.sourceKey);
+  const menuKeys = workbook.menuItems.map((row) => row.sourceKey);
+  assert.equal(new Set(ingredientKeys).size, ingredientKeys.length);
+  assert.equal(new Set(menuKeys).size, menuKeys.length);
+  assert.deepEqual(
+    again.ingredients.map((row) => row.sourceKey),
+    ingredientKeys,
+  );
+  assert.deepEqual(
+    again.menuItems.map((row) => row.sourceKey),
+    menuKeys,
+  );
+});
+
+test("blank purchase costs stay blank", () => {
+  const chicken = workbook.ingredients.find((row) => row.name === "Chicken");
+  const cotija = workbook.ingredients.find((row) => row.name === "Cotija Cheese");
+  const blankPastor = workbook.ingredients.find((row) => row.name === "Al Pastor" && row.purchaseCost == null);
+  const pricedPastor = workbook.ingredients.find((row) => row.name === "Al Pastor" && row.purchaseCost != null);
+  assert.equal(chicken?.costPerUnit, null);
+  assert.equal(chicken?.purchaseCost, null);
+  assert.equal(cotija?.costPerUnit, null);
+  assert.equal(blankPastor?.costPerUnit, null);
+  assert.equal(blankPastor?.addonPrice, null);
+  close(pricedPastor?.costPerUnit ?? null, 0.5);
+  assert.equal(pricedPastor?.addonPrice, 3);
+  assert.ok(report.missingPrices.some((row) => row.name === "Chicken"));
+  assert.ok(report.missingPrices.some((row) => row.name === "Al Pastor" && row.unit === "lb"));
+  assert.equal(report.missingPrices.some((row) => row.name === "Al Pastor" && row.unit === "oz"), false);
+});
+
+test("menu summary matches the completed Chilakil items at a 30% target", () => {
+  assert.equal(report.targetFoodCostPct, 0.3);
+  const byo = item("Build Your Own Chilaquiles");
+  const burrito = item("Burrito de Chilaquiles");
+  const og = item("OG Breakfast Burrito");
+  assert.equal(byo.price, 12);
+  assert.equal(burrito.price, 12);
+  assert.equal(og.price, 11);
+  close(byo.menuCost, 5.03610119047619);
+  close(burrito.menuCost, 5.410267857142856);
+  close(og.menuCost, 3.63478125);
+  close(byo.foodCostPct, 5.03610119047619 / 12);
+  close(burrito.foodCostPct, 5.410267857142856 / 12);
+  close(og.foodCostPct, 3.63478125 / 11);
+  close(byo.suggestedPrice, 5.03610119047619 / 0.3);
+  close(burrito.suggestedPrice, 5.410267857142856 / 0.3);
+  close(og.suggestedPrice, 3.63478125 / 0.3);
+
+  const box = byo.lines.find((line) => line.name === "#8 To-Go Box");
+  assert.equal(box?.menuCost, 0);
+  close(box?.catalogCost ?? null, 44 / 300);
+});
+
+test("base costs add onion and cilantro, and protein add-ons keep the sheet economics", () => {
+  const byo = item("Build Your Own Chilaquiles");
+  const burrito = item("Burrito de Chilaquiles");
+  close(byo.baseCost, 3.182767857142857);
+  close(byo.baseWithToppings, 3.857767857142857);
+  close(burrito.baseCost, 3.4102678571428564);
+  close(burrito.baseWithToppings, 4.085267857142856);
+  close(report.toppingCost, 0.675);
+
+  const asada = report.proteins.find((row) => row.name === "Carne Asada");
+  const pastor = report.proteins.find((row) => row.name === "Al Pastor");
+  const chorizo = report.proteins.find((row) => row.name === "Chorizo");
+  assert.equal(report.proteins.length, 3);
+  close(asada?.portionCost ?? null, 2);
+  close(asada?.costPerLb ?? null, 8);
+  assert.equal(asada?.addonPrice, 3);
+  close(asada?.contribution ?? null, 1);
+  close(asada?.addonCostPct ?? null, 2 / 3);
+  close(pastor?.portionCost ?? null, 2);
+  assert.equal(pastor?.addonPrice, 3);
+  close(chorizo?.portionCost ?? null, 1.5);
+  assert.equal(chorizo?.addonPrice, 2);
+  close(chorizo?.addonCostPct ?? null, 0.75);
+
+  const chilaquilesAsada = report.plates.find((row) => row.label === "Chilaquiles + Carne Asada");
+  const burritoAsada = report.plates.find((row) => row.label === "Burrito + Carne Asada");
+  const chilaquilesChorizo = report.plates.find((row) => row.label === "Chilaquiles + Chorizo");
+  close(chilaquilesAsada?.sellPrice ?? null, 15);
+  close(chilaquilesAsada?.totalCost ?? null, 5.857767857142857);
+  close(chilaquilesChorizo?.sellPrice ?? null, 14);
+  close(chilaquilesChorizo?.totalCost ?? null, 5.357767857142857);
+  close(burritoAsada?.sellPrice ?? null, 15);
+  close(burritoAsada?.totalCost ?? null, 6.085267857142856);
+});
+
+test("protein add-ons follow workbook rows when sample plates are absent", () => {
+  const names = report.proteins.map((row) => row.name).sort();
+  assert.deepEqual(names, ["Al Pastor", "Carne Asada", "Chorizo"]);
+  const withoutSamplePlates = {
+    ...workbook,
+    menuItems: workbook.menuItems.filter((item) => !/taco|quesadilla|thigh|pastor pork/i.test(item.name)),
+  };
+  assert.deepEqual(
+    buildFoodCostReport(withoutSamplePlates).proteins.map((row) => row.name).sort(),
+    names,
+  );
+  assert.ok(withoutSamplePlates.menuItems.some((item) => item.name === "Build Your Own Chilaquiles"));
+});
+
+test("a unit-cost what-if stays on one copy of the workbook", () => {
+  const pastor = workbook.ingredients.find((row) => row.name === "Al Pastor" && row.costPerUnit != null);
+  const asada = workbook.ingredients.find((row) => row.name === "Carne Asada" && row.portionQty != null);
+  assert.ok(pastor && asada);
+  const glendale = withFoodCostEdits(workbook, {
+    costPerUnit: { [pastor.sourceKey]: 0.75 },
+    prices: {},
+    addonPrices: {},
+  });
+  const glendaleReport = buildFoodCostReport(glendale);
+  const avondaleReport = buildFoodCostReport(workbook);
+  close(glendaleReport.proteins.find((row) => row.name === "Al Pastor")?.portionCost ?? null, 3);
+  close(avondaleReport.proteins.find((row) => row.name === "Al Pastor")?.portionCost ?? null, 2);
+  close(glendaleReport.proteins.find((row) => row.name === "Carne Asada")?.portionCost ?? null, 2);
+  assert.equal(workbook.ingredients.find((row) => row.sourceKey === pastor.sourceKey)?.costPerUnit, 0.5);
+
+  const byoKey = workbook.menuItems.find((item) => item.name === "Build Your Own Chilaquiles")?.sourceKey;
+  assert.ok(byoKey);
+  const repriced = buildFoodCostReport(
+    withFoodCostEdits(workbook, {
+      costPerUnit: {},
+      prices: { [byoKey]: 15 },
+      addonPrices: {},
     }),
-  }));
-  return { ingredients, items };
-}
+  );
+  assert.equal(repriced.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.price, 15);
+  assert.equal(report.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.price, 12);
 
-function costMap(ingredients: FoodCostIngredient[]) {
-  return new Map(ingredients.map((ingredient) => [ingredient.id, ingredient.costPerUnit]));
-}
-
-test("Glendale pastor plate matches the workbook and a 30% suggested price", () => {
-  const { ingredients, items } = kitchen("glendale", GLENDALE_COSTS);
-  const pastor = items.find((item) => item.name === "Tacos al pastor (3)");
-  assert.ok(pastor);
-  const cost = recipeCost(pastor.lines, costMap(ingredients));
-  assert.ok(Math.abs(cost - 2.653) < 1e-9);
-  const quote = quoteSale(cost, pastor.price);
-  assert.equal(quote.recipeCost, 2.65);
-  assert.equal(quote.foodCostPct, cost / 13.5);
-  assert.equal(quote.grossProfit, 10.85);
-  assert.equal(quote.suggestedPrice, roundMoney(cost / TARGET_FOOD_COST_PCT));
-  assert.equal(quote.suggestedPrice, 8.84);
-  assert.ok(quote.suggestedPrice < pastor.price);
+  const average = workbook.ingredients.find((row) => row.name === "Average Protein");
+  assert.ok(average?.sourceKey);
+  const withProtein = buildFoodCostReport(
+    withFoodCostEdits(workbook, {
+      costPerUnit: { [average.sourceKey]: (average.costPerUnit ?? 0) + 1 },
+      prices: {},
+      addonPrices: {},
+    }),
+  );
+  const before = report.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.menuCost ?? 0;
+  const after = withProtein.menu.find((row) => row.name === "Build Your Own Chilaquiles")?.menuCost ?? 0;
+  assert.ok(after > before);
+  const plateBefore = report.plates.find((row) => row.label === "Chilaquiles + Al Pastor")?.totalCost ?? 0;
+  const plateAfter = glendaleReport.plates.find((row) => row.label === "Chilaquiles + Al Pastor")?.totalCost ?? 0;
+  assert.ok(plateAfter > plateBefore);
+  assert.equal(asada.name, "Carne Asada");
 });
 
-test("Avondale keeps its own costs and trailer prices", () => {
-  const glendale = kitchen("glendale", GLENDALE_COSTS);
-  const avondale = kitchen("avondale", AVONDALE_COSTS);
-  const gPastor = glendale.items.find((item) => item.name === "Tacos al pastor (3)");
-  const aPastor = avondale.items.find((item) => item.name === "Tacos al pastor (3)");
-  assert.ok(gPastor && aPastor);
-  const gCost = recipeCost(gPastor.lines, costMap(glendale.ingredients));
-  const aCost = recipeCost(aPastor.lines, costMap(avondale.ingredients));
-  assert.ok(Math.abs(aCost - 2.785) < 1e-9);
-  assert.notEqual(gCost, aCost);
-  assert.equal(aPastor.price, 13);
-  assert.equal(gPastor.price, 13.5);
-  const drink = avondale.items.find((item) => item.name === "Horchata 16oz");
-  assert.equal(drink?.price, 3.75);
-});
-
-test("raising a protein cost updates that plate, the burrito, and the add-on only", () => {
-  const { ingredients, items } = kitchen("glendale", GLENDALE_COSTS);
-  const baseAddons = proteinAddonsForLocation(ingredients, items);
-  const asada = baseAddons.find((addon) => addon.ingredientName === "Carne asada");
-  const pastor = baseAddons.find((addon) => addon.ingredientName === "Pastor pork");
-  const chicken = baseAddons.find((addon) => addon.ingredientName === "Chicken thigh");
-  assert.ok(asada && pastor && chicken);
-  assert.equal(asada.portionQty, 0.38);
-  assert.equal(asada.portionFromRecipe, "Carne asada tacos (3)");
-  assert.ok(Math.abs(asada.recipeCost - 0.38 * 8.4) < 1e-9);
-  assert.equal(roundMoney(pastor.recipeCost), 1.79);
-  assert.equal(roundMoney(0.35 * 5.3), 1.86);
-  assert.ok(Math.abs(chicken.recipeCost - 0.28 * 3.8) < 1e-9);
-
-  const bumped = ingredients.map((ingredient) =>
-    ingredient.name === "Carne asada" ? { ...ingredient, costPerUnit: 10 } : ingredient,
-  );
-  const nextAddons = proteinAddonsForLocation(bumped, items);
-  const nextAsada = nextAddons.find((addon) => addon.ingredientName === "Carne asada");
-  const nextPastor = nextAddons.find((addon) => addon.ingredientName === "Pastor pork");
-  assert.ok(nextAsada && nextPastor);
-  assert.ok(Math.abs(nextAsada.recipeCost - 3.8) < 1e-9);
-  assert.equal(nextPastor.recipeCost, pastor.recipeCost);
-
-  const costs = costMap(bumped);
-  const tacos = items.find((item) => item.name === "Carne asada tacos (3)");
-  const burrito = items.find((item) => item.name === "Burrito Chilakil");
-  const horchata = items.find((item) => item.name === "Horchata 16oz");
-  assert.ok(tacos && burrito && horchata);
-  assert.ok(recipeCost(tacos.lines, costs) > recipeCost(tacos.lines, costMap(ingredients)));
-  assert.ok(recipeCost(burrito.lines, costs) > recipeCost(burrito.lines, costMap(ingredients)));
-  assert.equal(recipeCost(horchata.lines, costs), recipeCost(horchata.lines, costMap(ingredients)));
-
-  const addonQuote = quoteSale(nextAsada.recipeCost, PROTEIN_ADDON_PRICE);
-  assert.equal(addonQuote.recipeCost, 3.8);
-  assert.equal(addonQuote.suggestedPrice, roundMoney(nextAsada.recipeCost / 0.3));
-  assert.ok(addonQuote.foodCostPct !== null && addonQuote.foodCostPct > TARGET_FOOD_COST_PCT);
-});
-
-test("a Glendale protein what-if does not change the Avondale add-on", () => {
-  const glendale = kitchen("glendale", GLENDALE_COSTS);
-  const avondale = kitchen("avondale", AVONDALE_COSTS);
-  const grouped = groupFoodCostLocations(
-    ["glendale", "avondale"],
-    [...glendale.ingredients, ...avondale.ingredients],
-    [...glendale.items, ...avondale.items],
-  );
-  assert.deepEqual(
-    grouped.map((location) => location.locationId),
-    ["glendale", "avondale"],
-  );
-  assert.ok(grouped[0].ingredients.every((ingredient) => ingredient.id.startsWith("glendale:")));
-  assert.ok(grouped[1].items.every((item) => item.id.startsWith("avondale:")));
-  assert.deepEqual(
-    grouped[0].ingredients.slice(0, 3).map((ingredient) => ingredient.name),
-    ["Carne asada", "Chicken thigh", "Pastor pork"],
-  );
-
-  const editedGlendale = grouped[0].ingredients.map((ingredient) =>
-    ingredient.name === "Pastor pork" ? { ...ingredient, costPerUnit: 9 } : ingredient,
-  );
-  const gAddon = proteinAddonsForLocation(editedGlendale, grouped[0].items).find(
-    (addon) => addon.ingredientName === "Pastor pork",
-  );
-  const aAddon = proteinAddonsForLocation(grouped[1].ingredients, grouped[1].items).find(
-    (addon) => addon.ingredientName === "Pastor pork",
-  );
-  assert.ok(gAddon && aAddon);
-  assert.ok(Math.abs(gAddon.recipeCost - 0.35 * 9) < 1e-9);
-  assert.ok(Math.abs(aAddon.recipeCost - 0.35 * 5.3) < 1e-9);
-  assert.notEqual(gAddon.ingredientId, aAddon.ingredientId);
-});
-
-test("a single-location scope drops the other kitchen", () => {
-  const glendale = kitchen("glendale", GLENDALE_COSTS);
-  const avondale = kitchen("avondale", AVONDALE_COSTS);
-  const onlyTrailer = groupFoodCostLocations(
-    ["avondale"],
-    [...glendale.ingredients, ...avondale.ingredients],
-    [...glendale.items, ...avondale.items],
-  );
-  assert.equal(onlyTrailer.length, 1);
-  assert.equal(onlyTrailer[0].locationId, "avondale");
-  assert.equal(onlyTrailer[0].items.length, PLATES.length);
-  assert.ok(onlyTrailer[0].ingredients.every((ingredient) => ingredient.id.startsWith("avondale:")));
-});
-
-test("cost input rejects blanks and keeps workbook dollars", () => {
-  assert.equal(parseCostInput(""), null);
-  assert.equal(parseCostInput("8.40"), 8.4);
-  assert.equal(parseCostInput("$3"), 3);
-  assert.equal(parseCostInput("-1"), null);
-  assert.equal(costsDiffer(8.4, 8.4), false);
-  assert.equal(costsDiffer(8.4, 8.7), true);
+test("empty template items stay unpriced", () => {
+  for (const name of ["Torta de Chilaquiles", "Keto Chilaquiles", "Breakfast Burrito", "Chorizo & Egg Burrito", "Breakfast Bowl"]) {
+    const row = item(name);
+    assert.equal(row.price, null);
+    assert.equal(row.menuCost, null);
+    assert.equal(row.costed, false);
+  }
 });
