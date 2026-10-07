@@ -1,0 +1,44 @@
+{
+  "records": [
+    {
+      "location": "glendale",
+      "uberStoreId": "91bb8a8e-e9c5-5c0d-88a0-671cb75faf20",
+      "weekStart": "2026-09-28",
+      "weekEnd": "2026-10-04",
+      "subtotal": 1403.97,
+      "tax": 143.3,
+      "gross": 1547.27,
+      "orderCount": 49,
+      "deliveryOrders": 48,
+      "pickupOrders": 1,
+      "commission": -371.47,
+      "marketingFees": -154.5,
+      "promoFees": -32.67,
+      "adjustments": -210.74,
+      "errorCharges": null,
+      "netPayout": 777.89,
+      "source": "example",
+      "notes": "Uber may label stores by city. This store is Glendale. Notes are ignored by ingest."
+    },
+    {
+      "location": "avondale",
+      "uberStoreId": "a4232345-3850-5bb6-92bf-27434a445d64",
+      "weekStart": "2026-09-28",
+      "weekEnd": "2026-10-04",
+      "subtotal": 703,
+      "tax": 61.89,
+      "gross": 764.89,
+      "orderCount": 25,
+      "deliveryOrders": 22,
+      "pickupOrders": 3,
+      "commission": -183.23,
+      "marketingFees": -27.2,
+      "promoFees": -4.95,
+      "adjustments": 0,
+      "errorCharges": null,
+      "netPayout": 549.51,
+      "source": "example",
+      "notes": "Uber labels this store Phoenix. Treat the store id as Avondale."
+    }
+  ]
+}
