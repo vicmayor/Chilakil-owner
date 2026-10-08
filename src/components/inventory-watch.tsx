@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { LocationDot } from "@/components/ui";
+import { AlertCard } from "@/components/design/alert-card";
 import type { LocationId } from "@/lib/location";
 
 export function InventoryWatch({
@@ -9,21 +8,18 @@ export function InventoryWatch({
 }) {
   if (rows.length === 0) return null;
   return (
-    <section>
-      <h2 className="mb-2 text-sm font-semibold">Inventory</h2>
-      <div className="space-y-2">
-        {rows.map((row) => (
-          <Link
-            key={row.locationId}
-            href="/inventory"
-            className="block rounded-2xl border border-line bg-card p-4"
-          >
-            <LocationDot id={row.locationId} />
-            <p className="mt-2 text-sm font-bold">Se terminó {row.out}</p>
-            <p className="text-sm font-bold">Queda poco {row.low}</p>
-          </Link>
-        ))}
-      </div>
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold">Inventory</h2>
+      {rows.map((row) => (
+        <AlertCard key={row.locationId} tone="problem" href="/inventory" title={placeTitle(row.locationId)}>
+          <p>Se terminó {row.out}</p>
+          <p>Queda poco {row.low}</p>
+        </AlertCard>
+      ))}
     </section>
   );
+}
+
+function placeTitle(id: LocationId): string {
+  return id === "avondale" ? "Trailer · Avondale" : "Restaurant · Glendale";
 }

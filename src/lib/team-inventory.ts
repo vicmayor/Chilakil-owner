@@ -23,6 +23,14 @@ export const INVENTORY_CHIPS: { id: InventoryChip; label: string }[] = [
   { id: "unreviewed", label: "Sin revisar" },
 ];
 
+export function parseInventoryChip(value: string | string[] | undefined): InventoryChip | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === "out" || raw === "low" || raw === "toBuy" || raw === "onTheWay" || raw === "unreviewed") {
+    return raw;
+  }
+  return null;
+}
+
 export type InventoryItemView = {
   itemId: string;
   name: string;

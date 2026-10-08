@@ -13,6 +13,7 @@ import {
   groupInventoryByCategory,
   inventoryActionAlert,
   inventorySyncIsFresh,
+  parseInventoryChip,
   itemIsPending,
   neededDatePresentation,
   quantityLabel,
@@ -219,6 +220,13 @@ test("the inventory client uses the shared key and does not put it in the URL", 
   assert.equal(`${seenAuthorization}`, "Bearer live-key");
   assert.equal(seenUrl.includes("live-key"), false);
   assert.match(INVENTORY_FORBIDDEN_HINT, /Activa el permiso de inventario/);
+});
+
+test("inventory chip query values stay on the five filters", () => {
+  assert.equal(parseInventoryChip("out"), "out");
+  assert.equal(parseInventoryChip(["low"]), "low");
+  assert.equal(parseInventoryChip("all"), null);
+  assert.equal(parseInventoryChip(undefined), null);
 });
 
 test("a clean sync under 60 seconds is fresh and a stale row is not", () => {

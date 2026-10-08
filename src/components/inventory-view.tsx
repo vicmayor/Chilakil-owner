@@ -1,25 +1,14 @@
-"use client";
-
-import { useMemo, useState, useTransition } from "react";
-import { ChevronDown, TriangleAlert } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { setLocationScope } from "@/app/actions/location";
+import { AlertCard } from "@/components/design/alert-card";
+import { formatSyncStamp } from "@/components/design/sync-status";
+import { InventoryCatalog, type InventoryChipSelection } from "@/components/inventory-catalog";
 import { SyncInventoryButton } from "@/components/sync-inventory-button";
-import { Card, LocationDot } from "@/components/ui";
+import { TopBar } from "@/components/top-bar";
+import { LocationDot } from "@/components/ui";
 import { formatPhoenixDateTime } from "@/lib/dates";
-import type { LocationScope } from "@/lib/location";
-import { LOCATIONS } from "@/lib/location";
+import { LOCATIONS, type LocationScope } from "@/lib/location";
 import {
-  INVENTORY_CHIPS,
-  categoryLabel,
-  filterInventoryItems,
-  formatInventorySyncedAt,
-  groupInventoryByCategory,
   inventoryActionAlert,
   recentInventoryAlerts,
-  type InventoryCategoryGroup,
-  type InventoryChip,
-  type InventoryItemView,
   type InventoryLocationBlock,
   type InventoryPageData,
 } from "@/lib/team-inventory";
@@ -29,140 +18,54 @@ export function InventoryScreen({
   data,
   scope,
   connected,
+  chips,
 }: {
   data: InventoryPageData;
   scope: LocationScope;
   connected: boolean;
+  chips: InventoryChipSelection;
 }) {
   const singleBlock = scope === "all" ? null : data.blocks[0];
+  const syncLabel = !connected
+    ? "Not connected"
+    : data.lastSuccessAt
+      ? `Last synced: ${formatSyncStamp(new Date(data.lastSuccessAt))}${data.stale ? " · stale" : ""}`
+      : "Not synced yet";
 
   return (
     <>
-      <header
-        className="bg-paper px-4 pb-2"
-        style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
-      >
-        <div className="mx-auto max-w-lg">
-          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-muted">Chilakil / Team</p>
-          <h1 className="font-display mt-1 text-[2.6rem] font-extrabold leading-none tracking-tight">INVENTORY</h1>
-          <div className="mt-4">
-            <InventoryLocationSwitch scope={scope} />
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="flex items-center gap-2 text-sm font-semibold">
-              <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${data.lastSuccessAt && !data.stale ? "bg-sage" : "bg-mesa"}`}
-                aria-hidden
-              />
-              {data.lastSuccessAt
-                ? `${formatInventorySyncedAt(data.lastSuccessAt)}${data.stale ? " · stale" : ""}`
-                : "Not synced yet"}
-            </p>
-            {connected ? <SyncInventoryButton /> : null}
-          </div>
-          {scope === "all" ? (
-            <p className="mt-2 text-xs text-muted">Both locations. Each block stays on its own.</p>
-          ) : null}
-        </div>
-      </header>
-      <main className="space-y-4 px-4 py-4">
+      <TopBar
+        title="Inventory"
+        subtitle="Read-only. Consulting this report does not confirm receipts or purchases."
+        scope={scope}
+        syncLabel={syncLabel}
+        syncAction={connected ? <SyncInventoryButton /> : undefined}
+      />
+      <main className="space-y-4 px-4 py-4 md:px-6">
         {connected ? null : (
-          <Card>
-            <p className="text-base font-medium">Not connected</p>
-            <p className="mt-1 text-sm text-muted">
-              Set CHILAKIL_TEAM_API_KEY and turn on inventory access in Team → Owner API. The base URL defaults to
-              https://team.chilakiltogo.com.
-            </p>
-          </Card>
+          <AlertCard tone="notice" title="Not connected">
+            Set CHILAKIL_TEAM_API_KEY and turn on inventory access in Team → Owner API. The base URL defaults to
+            https://team.chilakiltogo.com.
+          </AlertCard>
         )}
         {data.stale && data.lastError ? (
-          <div className="rounded-2xl border border-warn bg-warn-soft p-4 text-sm">
-            <p className="font-bold">Inventario desactualizado · Inventory may be stale</p>
-            <p className="mt-1">{data.lastError}</p>
-          </div>
+          <AlertCard tone="problem" title="Inventario desactualizado · Inventory may be stale">
+            {data.lastError}
+          </AlertCard>
         ) : null}
         {singleBlock?.hasSummary ? <InventoryActionAlert summary={singleBlock.summary} /> : null}
         <RecentAlerts blocks={data.blocks} />
-        <p className="text-xs text-muted">Read-only. Consulting this report does not confirm receipts or purchases.</p>
         {data.blocks.map((block) => (
-          <LocationInventory key={block.locationId} block={block} showAlert={scope === "all"} labeled={scope === "all"} />
+          <LocationInventory
+            key={block.locationId}
+            block={block}
+            chips={chips}
+            showAlert={scope === "all"}
+            labeled={scope === "all"}
+          />
         ))}
       </main>
     </>
-  );
-}
-
-function InventoryLocationSwitch({ scope }: { scope: LocationScope }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-
-  function select(next: LocationScope) {
-    if (next === scope) return;
-    start(async () => {
-      await setLocationScope(next);
-      router.refresh();
-    });
-  }
-
-  return (
-    <div className={pending ? "opacity-70" : ""}>
-      <div role="tablist" aria-label="Location" className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-white p-1">
-        <LocationChoice
-          active={scope === "glendale"}
-          tone="ink"
-          kicker="Restaurant"
-          label="Glendale"
-          onSelect={() => select("glendale")}
-        />
-        <LocationChoice
-          active={scope === "avondale"}
-          tone="gray"
-          kicker="Trailer"
-          label="Avondale"
-          onSelect={() => select("avondale")}
-        />
-      </div>
-      {scope === "all" ? null : (
-        <button
-          type="button"
-          onClick={() => select("all")}
-          className="mt-2 inline-flex items-center text-sm font-bold text-ink"
-        >
-          Both locations
-        </button>
-      )}
-    </div>
-  );
-}
-
-function LocationChoice({
-  active,
-  tone,
-  kicker,
-  label,
-  onSelect,
-}: {
-  active: boolean;
-  tone: "ink" | "gray";
-  kicker: string;
-  label: string;
-  onSelect: () => void;
-}) {
-  const selected =
-    tone === "ink" ? "bg-ink text-white" : "bg-paper-2 text-ink";
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onSelect}
-      className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-2 leading-tight ${
-        active ? selected : "bg-transparent text-muted"
-      }`}
-    >
-      <span className="text-[10px] font-bold uppercase tracking-[0.14em]">{kicker}</span>
-      <span className="text-sm font-extrabold">{label}</span>
-    </button>
   );
 }
 
@@ -170,63 +73,44 @@ function RecentAlerts({ blocks }: { blocks: InventoryLocationBlock[] }) {
   const alerts = recentInventoryAlerts(blocks);
   if (alerts.length === 0) return null;
   return (
-    <section className="rounded-2xl bg-[#fff4cc] px-4 py-3">
-      <h2 className="text-sm font-extrabold">Recent alerts</h2>
-      <ul className="mt-2 space-y-2">
+    <AlertCard tone="notice" title="Recent alerts">
+      <ul className="space-y-2">
         {alerts.map((alert) => (
-          <li key={alert.key} className="text-sm font-semibold leading-5">
-            {alert.line}
-          </li>
+          <li key={alert.key}>{alert.line}</li>
         ))}
       </ul>
-    </section>
+    </AlertCard>
   );
 }
 
 function InventoryActionAlert({ summary }: { summary: MappedInventorySummary }) {
   const alert = inventoryActionAlert(summary);
   return (
-    <div className="flex gap-3 rounded-2xl bg-danger-soft px-4 py-3 text-danger">
-      <TriangleAlert className="mt-0.5 shrink-0" size={22} aria-hidden />
-      <div>
-        <p className="font-bold leading-5">{alert.headline}</p>
-        <p className="mt-0.5 text-sm font-semibold">{alert.detail}</p>
-      </div>
-    </div>
+    <AlertCard tone="problem" title={alert.headline}>
+      {alert.detail}
+    </AlertCard>
   );
 }
 
 function LocationInventory({
   block,
+  chips,
   showAlert,
   labeled,
 }: {
   block: InventoryLocationBlock;
+  chips: InventoryChipSelection;
   showAlert: boolean;
   labeled: boolean;
 }) {
-  const [chip, setChip] = useState<InventoryChip | null>(null);
-  const [category, setCategory] = useState("");
-  const [search, setSearch] = useState("");
-  const categories = useMemo(() => {
-    const labels = [...new Set(block.items.map((item) => categoryLabel(item.category)))];
-    const known = new Map(groupInventoryByCategory(block.items).map((group, index) => [group.label, index]));
-    return labels.sort((a, b) => (known.get(a) ?? 0) - (known.get(b) ?? 0));
-  }, [block.items]);
-  const visible = filterInventoryItems(block.items, {
-    chip,
-    category: category || null,
-    search,
-  });
   const place = LOCATIONS[block.locationId].name;
-
   const placeTitle = block.locationId === "avondale" ? "Trailer · Avondale" : "Restaurant · Glendale";
 
   return (
     <section className="space-y-3" aria-label={place}>
       {labeled ? (
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-extrabold">{placeTitle}</h2>
+        <div className="flex items-center justify-between gap-2 px-1">
+          <h2 className="font-display text-2xl font-extrabold leading-none">{placeTitle}</h2>
           <LocationDot id={block.locationId} />
         </div>
       ) : null}
@@ -237,172 +121,12 @@ function LocationInventory({
         </p>
       ) : null}
       {block.hasSummary ? (
-        <div className="flex flex-wrap gap-2">
-          {INVENTORY_CHIPS.map((option) => {
-            const active = chip === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => setChip(active ? null : option.id)}
-                className={`inline-flex min-h-11 items-center rounded-full px-3 text-xs font-bold ${
-                  active ? "bg-chile text-ink" : "border border-line bg-card text-ink"
-                }`}
-              >
-                {option.label} {block.summary[option.id]}
-              </button>
-            );
-          })}
-        </div>
+        <InventoryCatalog block={block} chips={chips} />
       ) : (
-        <Card>
-          <p className="text-base font-medium">Sin inventario sincronizado</p>
-          <p className="mt-1 text-sm text-muted">This location has no inventory report yet.</p>
-        </Card>
+        <AlertCard tone="notice" title="Sin inventario sincronizado">
+          This location has no inventory report yet.
+        </AlertCard>
       )}
-      {block.hasSummary ? (
-        <>
-          <div className="flex flex-col gap-2">
-            <label className="sr-only" htmlFor={`search-${block.locationId}`}>
-              Search products
-            </label>
-            <input
-              id={`search-${block.locationId}`}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search products"
-              className="min-h-11 rounded-full border border-line bg-card px-4 text-sm"
-            />
-            <label className="text-xs font-semibold text-muted" htmlFor={`category-${block.locationId}`}>
-              Category
-            </label>
-            <select
-              id={`category-${block.locationId}`}
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-              className="min-h-11 rounded-2xl border border-line bg-card px-3 text-sm font-semibold"
-            >
-              <option value="">All categories</option>
-              {categories.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted">
-              Pending counts a product once when it is low, out, unreviewed, or marked needed.
-            </p>
-          </div>
-          {visible.length === 0 ? (
-            <Card>
-              <p className="text-sm font-medium">No products match</p>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {groupInventoryByCategory(visible).map((group) => (
-                <CategoryAccordion key={group.label} group={group} />
-              ))}
-            </div>
-          )}
-        </>
-      ) : null}
     </section>
   );
-}
-
-function CategoryAccordion({ group }: { group: InventoryCategoryGroup }) {
-  const [open, setOpen] = useState(group.pending > 0);
-  const products = group.items.length === 1 ? "1 product" : `${group.items.length} products`;
-  return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-card">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center justify-between gap-2 px-4 text-left"
-      >
-        <span className="min-w-0 text-sm font-extrabold leading-4">{group.label}</span>
-        <span className="flex shrink-0 items-center gap-2">
-          <span className="text-xs font-semibold text-muted">{products}</span>
-          <span className="rounded-full bg-chile px-2 py-0.5 text-[11px] font-bold text-ink">{group.pending} pending</span>
-          <ChevronDown size={16} className={open ? "rotate-180" : ""} aria-hidden />
-        </span>
-      </button>
-      {open ? (
-        <ul className="space-y-2 border-t border-line p-2">
-          {group.items.map((item) => (
-            <li key={item.itemId}>
-              <ItemCard item={item} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
-  );
-}
-
-function ItemCard({ item }: { item: InventoryItemView }) {
-  return (
-    <article className="rounded-2xl border border-line bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-bold leading-5">{item.name}</h3>
-          <p className="text-xs text-muted">
-            {item.nameEn} · {categoryLabel(item.category)}
-          </p>
-        </div>
-        <StatusBadge status={item.status} label={item.statusLabel} />
-      </div>
-      <p className="mt-3 font-display text-2xl font-extrabold leading-none">{item.quantityText}</p>
-      {item.unitLabel ? <p className="mt-1 text-xs text-muted">{item.unitLabel}</p> : null}
-      {item.supplier ? <p className="mt-1 text-xs text-muted">{item.supplier}</p> : null}
-      <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted">Compra</dt>
-          <dd className="font-bold">{item.purchaseLabel}</dd>
-        </div>
-        <div>
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted">Entrega</dt>
-          <dd className="font-bold">{item.deliveryLabel}</dd>
-        </div>
-      </dl>
-      {item.neededLabel ? (
-        <p className={`mt-3 text-sm font-bold ${item.neededOverdue ? "text-danger" : "text-ink"}`}>
-          {item.neededByLabel ? `${item.neededByLabel} · ` : ""}
-          {item.neededLabel}
-        </p>
-      ) : null}
-      <p className="mt-3 text-xs text-muted">
-        Último conteo: {countLabel(item.lastCountedAt, item.lastCountedBy)}
-      </p>
-      {item.lastUpdatedAt ? (
-        <p className="text-xs text-muted">
-          Actualizado: {countLabel(item.lastUpdatedAt, item.lastUpdatedBy)}
-        </p>
-      ) : null}
-    </article>
-  );
-}
-
-function StatusBadge({ status, label }: { status: InventoryItemView["status"]; label: string }) {
-  const tone =
-    status === "out"
-      ? "bg-ink text-white"
-      : status === "low"
-        ? "bg-chile text-ink"
-        : status === "sufficient"
-          ? "bg-sage-soft text-sage"
-          : "bg-paper-2 text-ink";
-  return (
-    <span className={`inline-flex shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${tone}`}>
-      {label}
-    </span>
-  );
-}
-
-function countLabel(at: string | null, by: string | null): string {
-  if (!at) return "Sin contar";
-  const when = formatPhoenixDateTime(new Date(at));
-  return by ? `${when} · ${by}` : when;
 }
