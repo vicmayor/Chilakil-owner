@@ -8,6 +8,8 @@ import {
   INVENTORY_FORBIDDEN_HINT,
   blocksForScope,
   filterInventoryItems,
+  formatInventorySyncedAt,
+  inventoryActionAlert,
   neededDatePresentation,
   quantityLabel,
   type InventoryLocationBlock,
@@ -138,6 +140,15 @@ test("a fractional piece quantity is rejected and locations stay separate in fil
   const overdue = glendaleOnly[0].items.find((item) => item.itemId === "carne-asada");
   assert.equal(overdue?.neededOverdue, true);
   assert.equal(overdue?.neededLabel, "2026-09-30 vencido");
+  assert.deepEqual(inventoryActionAlert(visible[0].summary), {
+    headline: "2 need action · 2 awaiting delivery",
+    detail: "1 out of stock",
+  });
+  assert.deepEqual(inventoryActionAlert(visible[1].summary), {
+    headline: "1 need action · 1 awaiting delivery",
+    detail: "0 out of stock",
+  });
+  assert.equal(formatInventorySyncedAt("2026-10-08T03:41:00-07:00"), "Last synced: Oct 8 at 3:41 AM");
 });
 
 test("the inventory client uses the shared key and does not put it in the URL", async () => {

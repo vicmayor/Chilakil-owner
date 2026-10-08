@@ -1,3 +1,4 @@
+import { BUSINESS_TZ } from "@/lib/dates";
 import type { LocationId, LocationScope } from "@/lib/location";
 import { locationIdsForScope } from "@/lib/location";
 import type {
@@ -113,6 +114,33 @@ export function deliveryLabel(delivery: InventoryDelivery): string {
 
 export function neededByLabel(neededBy: InventoryNeededBy): string | null {
   return neededBy ? NEEDED_BY_LABELS[neededBy] : null;
+}
+
+/** toBuy is need action, onTheWay is awaiting delivery, out is out of stock. Counts are not added together. */
+export function inventoryActionAlert(summary: Pick<MappedInventorySummary, "toBuy" | "onTheWay" | "out">): {
+  headline: string;
+  detail: string;
+} {
+  return {
+    headline: `${summary.toBuy} need action · ${summary.onTheWay} awaiting delivery`,
+    detail: `${summary.out} out of stock`,
+  };
+}
+
+/** Phoenix clock, shaped like "Last synced: Oct 8 at 3:41 AM". */
+export function formatInventorySyncedAt(iso: string): string {
+  const dt = new Date(iso);
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TZ,
+    month: "short",
+    day: "numeric",
+  }).format(dt);
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TZ,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(dt);
+  return `Last synced: ${date} at ${time}`;
 }
 
 /**
