@@ -145,6 +145,8 @@ Sync now, `POST /api/sync/inventory`, and the hours sync route read:
 
 There is no pay period. `generatedAt` is the report time, not the last count. A successful response replaces only the locations in that response. Syncing Glendale does not delete Avondale. Unknown quantities stay null and show as Sin contar. Pound quantities are already in pounds. Summary chips can overlap, and ALL shows two labeled blocks.
 
+A product is pending once when its status is low, out, or unreviewed, or its purchase is needed. Recent alerts list only low and out. Each line uses `lastUpdatedAt` and names the location. Category ids such as `supplies` and `protein` use catalog labels. An unknown id is shown as sent.
+
 `401`, `403`, `400`, `405`, `503`, and network errors leave the last rows in place.
 
 ```bash

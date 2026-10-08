@@ -1,6 +1,6 @@
 import { BUSINESS_TZ } from "@/lib/dates";
 import type { LocationId, LocationScope } from "@/lib/location";
-import { locationIdsForScope } from "@/lib/location";
+import { LOCATIONS, locationIdsForScope } from "@/lib/location";
 import type {
   InventoryDelivery,
   InventoryNeededBy,
@@ -127,8 +127,8 @@ export function inventoryActionAlert(summary: Pick<MappedInventorySummary, "toBu
   };
 }
 
-/** Phoenix clock, shaped like "Last synced: Oct 8 at 3:41 AM". */
-export function formatInventorySyncedAt(iso: string): string {
+/** Phoenix clock, shaped like "Oct 8 at 3:41 AM". */
+export function formatPhoenixAt(iso: string): string {
   const dt = new Date(iso);
   const date = new Intl.DateTimeFormat("en-US", {
     timeZone: BUSINESS_TZ,
@@ -140,7 +140,136 @@ export function formatInventorySyncedAt(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(dt);
-  return `Last synced: ${date} at ${time}`;
+  return `${date} at ${time}`;
+}
+
+/** Phoenix clock, shaped like "Last synced: Oct 8 at 3:41 AM". */
+export function formatInventorySyncedAt(iso: string): string {
+  return `Last synced: ${formatPhoenixAt(iso)}`;
+}
+
+/**
+ * Team category ids shown with catalog names. An unknown id stays as sent.
+ * Lookup is case-insensitive; the fallback keeps the original text.
+ */
+const INVENTORY_CATEGORY_LABELS: Record<string, string> = {
+  soda: "Sodas & drinks",
+  sodas: "Sodas & drinks",
+  drink: "Sodas & drinks",
+  drinks: "Sodas & drinks",
+  beverage: "Sodas & drinks",
+  beverages: "Sodas & drinks",
+  "sodas-drinks": "Sodas & drinks",
+  "sodas-and-drinks": "Sodas & drinks",
+  dairy: "Dairy",
+  protein: "Proteins",
+  proteins: "Proteins",
+  produce: "Produce",
+  tortilla: "Tortillas & other ingredients",
+  tortillas: "Tortillas & other ingredients",
+  ingredient: "Tortillas & other ingredients",
+  ingredients: "Tortillas & other ingredients",
+  "tortillas-ingredients": "Tortillas & other ingredients",
+  "tortillas-and-other-ingredients": "Tortillas & other ingredients",
+  coffee: "Coffee & add-ins",
+  "add-in": "Coffee & add-ins",
+  "add-ins": "Coffee & add-ins",
+  addins: "Coffee & add-ins",
+  "coffee-add-ins": "Coffee & add-ins",
+  "coffee-and-add-ins": "Coffee & add-ins",
+  snack: "Snacks",
+  snacks: "Snacks",
+  supply: "Containers & supplies",
+  supplies: "Containers & supplies",
+  container: "Containers & supplies",
+  containers: "Containers & supplies",
+  "containers-supplies": "Containers & supplies",
+  "containers-and-supplies": "Containers & supplies",
+};
+
+export const INVENTORY_CATEGORY_ORDER = [
+  "Sodas & drinks",
+  "Dairy",
+  "Proteins",
+  "Produce",
+  "Tortillas & other ingredients",
+  "Coffee & add-ins",
+  "Snacks",
+  "Containers & supplies",
+] as const;
+
+export function categoryLabel(categoryId: string): string {
+  return INVENTORY_CATEGORY_LABELS[categoryId.trim().toLowerCase()] ?? categoryId;
+}
+
+/**
+ * Pending means the product needs action. It counts once when status is low, out,
+ * or unreviewed, or purchase is needed. A low item that is also needed is still one.
+ */
+export function itemIsPending(item: { status: InventoryStatus; purchase: InventoryPurchase }): boolean {
+  return item.status === "low" || item.status === "out" || item.status === "unreviewed" || item.purchase === "needed";
+}
+
+export type InventoryCategoryGroup = {
+  label: string;
+  items: InventoryItemView[];
+  pending: number;
+};
+
+export function groupInventoryByCategory(items: InventoryItemView[]): InventoryCategoryGroup[] {
+  const groups = new Map<string, InventoryItemView[]>();
+  for (const item of items) {
+    const label = categoryLabel(item.category);
+    const list = groups.get(label);
+    if (list) list.push(item);
+    else groups.set(label, [item]);
+  }
+  const order = new Map<string, number>(INVENTORY_CATEGORY_ORDER.map((label, index) => [label, index]));
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      const aOrder = order.get(a);
+      const bOrder = order.get(b);
+      if (aOrder != null && bOrder != null) return aOrder - bOrder;
+      if (aOrder != null) return -1;
+      if (bOrder != null) return 1;
+      return a.localeCompare(b);
+    })
+    .map(([label, groupItems]) => ({
+      label,
+      items: groupItems,
+      pending: groupItems.filter(itemIsPending).length,
+    }));
+}
+
+export type InventoryRecentAlert = {
+  key: string;
+  line: string;
+};
+
+/** Low and out only. Each line names its location. Times come from lastUpdatedAt. */
+export function recentInventoryAlerts(
+  blocks: { locationId: LocationId; items: InventoryItemView[] }[],
+): InventoryRecentAlert[] {
+  const rows: { key: string; at: string | null; line: string }[] = [];
+  for (const block of blocks) {
+    for (const item of block.items) {
+      if (item.status !== "low" && item.status !== "out") continue;
+      const phrase = item.status === "out" ? "Out of stock" : "Running low";
+      const when = item.lastUpdatedAt ? formatPhoenixAt(item.lastUpdatedAt) : "time unknown";
+      rows.push({
+        key: `${block.locationId}|${item.itemId}`,
+        at: item.lastUpdatedAt,
+        line: `${item.nameEn} · ${phrase} — ${LOCATIONS[block.locationId].shortName} · ${when}`,
+      });
+    }
+  }
+  rows.sort((a, b) => {
+    if (a.at && b.at && a.at !== b.at) return a.at < b.at ? 1 : -1;
+    if (a.at && !b.at) return -1;
+    if (!a.at && b.at) return 1;
+    return a.line.localeCompare(b.line);
+  });
+  return rows.map(({ key, line }) => ({ key, line }));
 }
 
 /**
@@ -163,7 +292,9 @@ export function filterInventoryItems(
   const search = options.search.trim().toLowerCase();
   return items.filter((item) => {
     if (options.chip && !itemMatchesChip(item, options.chip)) return false;
-    if (options.category && item.category !== options.category) return false;
+    if (options.category && item.category !== options.category && categoryLabel(item.category) !== options.category) {
+      return false;
+    }
     if (!search) return true;
     const haystack = [item.name, item.nameEn, item.category, item.supplier ?? "", item.itemId]
       .join(" ")

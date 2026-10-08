@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { TriangleAlert } from "lucide-react";
+import { ChevronDown, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { setLocationScope } from "@/app/actions/location";
 import { SyncInventoryButton } from "@/components/sync-inventory-button";
@@ -11,9 +11,13 @@ import type { LocationScope } from "@/lib/location";
 import { LOCATIONS } from "@/lib/location";
 import {
   INVENTORY_CHIPS,
+  categoryLabel,
   filterInventoryItems,
   formatInventorySyncedAt,
+  groupInventoryByCategory,
   inventoryActionAlert,
+  recentInventoryAlerts,
+  type InventoryCategoryGroup,
   type InventoryChip,
   type InventoryItemView,
   type InventoryLocationBlock,
@@ -76,6 +80,7 @@ export function InventoryScreen({
           </div>
         ) : null}
         {singleBlock?.hasSummary ? <InventoryActionAlert summary={singleBlock.summary} /> : null}
+        <RecentAlerts blocks={data.blocks} />
         <p className="text-xs text-muted">Read-only. Consulting this report does not confirm receipts or purchases.</p>
         {data.blocks.map((block) => (
           <LocationInventory key={block.locationId} block={block} showAlert={scope === "all"} labeled={scope === "all"} />
@@ -159,6 +164,23 @@ function LocationChoice({
   );
 }
 
+function RecentAlerts({ blocks }: { blocks: InventoryLocationBlock[] }) {
+  const alerts = recentInventoryAlerts(blocks);
+  if (alerts.length === 0) return null;
+  return (
+    <section className="rounded-2xl bg-[#fff4cc] px-4 py-3">
+      <h2 className="text-sm font-extrabold">Recent alerts</h2>
+      <ul className="mt-2 space-y-2">
+        {alerts.map((alert) => (
+          <li key={alert.key} className="text-sm font-semibold leading-5">
+            {alert.line}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function InventoryActionAlert({ summary }: { summary: MappedInventorySummary }) {
   const alert = inventoryActionAlert(summary);
   return (
@@ -184,10 +206,11 @@ function LocationInventory({
   const [chip, setChip] = useState<InventoryChip | null>(null);
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
-  const categories = useMemo(
-    () => [...new Set(block.items.map((item) => item.category))].sort(),
-    [block.items],
-  );
+  const categories = useMemo(() => {
+    const labels = [...new Set(block.items.map((item) => categoryLabel(item.category)))];
+    const known = new Map(groupInventoryByCategory(block.items).map((group, index) => [group.label, index]));
+    return labels.sort((a, b) => (known.get(a) ?? 0) - (known.get(b) ?? 0));
+  }, [block.items]);
   const visible = filterInventoryItems(block.items, {
     chip,
     category: category || null,
@@ -239,18 +262,18 @@ function LocationInventory({
       {block.hasSummary ? (
         <>
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-muted" htmlFor={`search-${block.locationId}`}>
-              Buscar
+            <label className="sr-only" htmlFor={`search-${block.locationId}`}>
+              Search products
             </label>
             <input
               id={`search-${block.locationId}`}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Nombre, categoría, proveedor"
-              className="min-h-11 rounded-2xl border border-line bg-card px-3 text-sm"
+              placeholder="Search products"
+              className="min-h-11 rounded-full border border-line bg-card px-4 text-sm"
             />
             <label className="text-xs font-semibold text-muted" htmlFor={`category-${block.locationId}`}>
-              Categoría
+              Category
             </label>
             <select
               id={`category-${block.locationId}`}
@@ -258,28 +281,60 @@ function LocationInventory({
               onChange={(event) => setCategory(event.target.value)}
               className="min-h-11 rounded-2xl border border-line bg-card px-3 text-sm font-semibold"
             >
-              <option value="">Todas</option>
+              <option value="">All categories</option>
               {categories.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
+            <p className="text-xs text-muted">
+              Pending counts a product once when it is low, out, unreviewed, or marked needed.
+            </p>
           </div>
           {visible.length === 0 ? (
             <Card>
-              <p className="text-sm font-medium">Nada coincide</p>
+              <p className="text-sm font-medium">No products match</p>
             </Card>
           ) : (
-            <ul className="space-y-2">
-              {visible.map((item) => (
-                <li key={item.itemId}>
-                  <ItemCard item={item} />
-                </li>
+            <div className="space-y-2">
+              {groupInventoryByCategory(visible).map((group) => (
+                <CategoryAccordion key={group.label} group={group} />
               ))}
-            </ul>
+            </div>
           )}
         </>
+      ) : null}
+    </section>
+  );
+}
+
+function CategoryAccordion({ group }: { group: InventoryCategoryGroup }) {
+  const [open, setOpen] = useState(group.pending > 0);
+  const products = group.items.length === 1 ? "1 product" : `${group.items.length} products`;
+  return (
+    <section className="overflow-hidden rounded-2xl border border-line bg-card">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-2 px-4 text-left"
+      >
+        <span className="min-w-0 text-sm font-extrabold leading-4">{group.label}</span>
+        <span className="flex shrink-0 items-center gap-2">
+          <span className="text-xs font-semibold text-muted">{products}</span>
+          <span className="rounded-full bg-chile px-2 py-0.5 text-[11px] font-bold text-ink">{group.pending} pending</span>
+          <ChevronDown size={16} className={open ? "rotate-180" : ""} aria-hidden />
+        </span>
+      </button>
+      {open ? (
+        <ul className="space-y-2 border-t border-line p-2">
+          {group.items.map((item) => (
+            <li key={item.itemId}>
+              <ItemCard item={item} />
+            </li>
+          ))}
+        </ul>
       ) : null}
     </section>
   );
@@ -292,7 +347,7 @@ function ItemCard({ item }: { item: InventoryItemView }) {
         <div>
           <h3 className="text-base font-bold leading-5">{item.name}</h3>
           <p className="text-xs text-muted">
-            {item.nameEn} · {item.category}
+            {item.nameEn} · {categoryLabel(item.category)}
           </p>
         </div>
         <StatusBadge status={item.status} label={item.statusLabel} />

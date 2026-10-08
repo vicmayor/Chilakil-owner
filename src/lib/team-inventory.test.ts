@@ -7,11 +7,15 @@ import { mapTeamInventoryResponse } from "./team-inventory-mapper";
 import {
   INVENTORY_FORBIDDEN_HINT,
   blocksForScope,
+  categoryLabel,
   filterInventoryItems,
   formatInventorySyncedAt,
+  groupInventoryByCategory,
   inventoryActionAlert,
+  itemIsPending,
   neededDatePresentation,
   quantityLabel,
+  recentInventoryAlerts,
   type InventoryLocationBlock,
 } from "./team-inventory";
 
@@ -149,6 +153,37 @@ test("a fractional piece quantity is rejected and locations stay separate in fil
     detail: "0 out of stock",
   });
   assert.equal(formatInventorySyncedAt("2026-10-08T03:41:00-07:00"), "Last synced: Oct 8 at 3:41 AM");
+  assert.equal(categoryLabel("supplies"), "Containers & supplies");
+  assert.equal(categoryLabel("protein"), "Proteins");
+  assert.equal(categoryLabel("DRY"), "DRY");
+  const supplies = filterInventoryItems(glendaleOnly[0].items, {
+    chip: null,
+    category: "Containers & supplies",
+    search: "",
+  });
+  assert.deepEqual(supplies.map((item) => item.itemId), ["bistro-bags-13"]);
+  const groups = groupInventoryByCategory(glendaleOnly[0].items);
+  assert.deepEqual(
+    groups.map((group) => [group.label, group.items.length, group.pending]),
+    [
+      ["Proteins", 1, 0],
+      ["Produce", 1, 0],
+      ["Containers & supplies", 1, 1],
+      ["dry", 1, 1],
+    ],
+  );
+  assert.equal(itemIsPending({ status: "sufficient", purchase: "needed" }), true);
+  assert.equal(itemIsPending({ status: "low", purchase: "needed" }), true);
+  assert.equal(itemIsPending({ status: "sufficient", purchase: "purchased" }), false);
+  const alerts = recentInventoryAlerts(visible);
+  assert.deepEqual(
+    alerts.map((alert) => alert.line),
+    [
+      "13″ Bistro Bags · Running low — Glendale · Oct 8 at 9:05 AM",
+      "Rice · Out of stock — Glendale · Oct 8 at 8:10 AM",
+    ],
+  );
+  assert.equal(alerts.some((alert) => alert.key.startsWith("avondale|")), false);
 });
 
 test("the inventory client uses the shared key and does not put it in the URL", async () => {
