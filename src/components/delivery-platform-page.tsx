@@ -42,7 +42,7 @@ export async function DeliveryPlatformPage({
         scope={scope}
       />
       {belowHeader}
-      <main className="space-y-4 px-4 py-4">
+      <main className="space-y-4 px-4 py-4 md:px-6">
         {platform === "doordash" ? <DoorDashWeeklySection /> : null}
         {platform === "ubereats" ? <UberEatsWeeklySection /> : null}
         {summaries.length > 0 ? (

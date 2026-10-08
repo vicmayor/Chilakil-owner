@@ -39,10 +39,10 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-6">
+      <ul className="mx-auto grid max-w-lg grid-cols-6 md:max-w-3xl">
         {TABS.map((tab) => {
           const active =
             tab.href === "/more"
@@ -68,6 +68,12 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
                   </span>
                 ) : null}
                 <span className="max-w-full truncate">{tab.label}</span>
+                <span
+                  className={`absolute bottom-1 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full ${
+                    active ? "bg-chile" : "bg-transparent"
+                  }`}
+                  aria-hidden
+                />
               </Link>
             </li>
           );

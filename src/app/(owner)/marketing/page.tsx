@@ -3,6 +3,7 @@ import { getLocationScope } from "@/lib/scope";
 import { locationIdsForScope, isCombinedScope } from "@/lib/location";
 import { formatShortDate } from "@/lib/dates";
 import { moneyExact, number, platformLabel } from "@/lib/format";
+import { RecordCard } from "@/components/design/record-card";
 import { TopBar } from "@/components/top-bar";
 import { Card, CombinedBadge, LocationDot } from "@/components/ui";
 
@@ -29,34 +30,40 @@ export default async function MarketingPage() {
   return (
     <>
       <TopBar title="Marketing" subtitle="Spend stays on the location that bought it" scope={scope} />
-      <main className="space-y-4 px-4 py-4">
-        <Card>
+      <main className="grid gap-4 px-4 py-4 md:grid-cols-2 md:px-6">
+        <Card className="md:col-span-2">
           {isCombinedScope(scope) ? <CombinedBadge /> : <LocationDot id={ids[0]} />}
           <p className="font-display mt-2 text-3xl font-extrabold tabular">{moneyExact(spend)}</p>
           <p className="text-sm text-muted">Location-assigned spend in this list (brand drafts = $0)</p>
         </Card>
         {scoped.map((c) => (
-          <Card key={c.id}>
-            <div className="flex items-center justify-between gap-2">
-              {c.locationId ? (
+          <RecordCard
+            key={c.id}
+            title={c.name}
+            status={c.status}
+            statusTone={c.status === "active" ? "ok" : "muted"}
+            kicker={
+              c.locationId ? (
                 <LocationDot id={c.locationId} />
               ) : (
-                <span className="text-xs font-bold uppercase tracking-wide text-muted">Brand — no location spend</span>
-              )}
-              <span className="text-[11px] font-bold uppercase text-muted">{c.status}</span>
-            </div>
-            <p className="mt-1 font-semibold">{c.name}</p>
-            <p className="text-sm text-muted">
-              {platformLabel(c.channel)} · {formatShortDate(c.startDate)}
-              {c.endDate ? ` – ${formatShortDate(c.endDate)}` : ""}
-            </p>
-            <p className="mt-2 tabular text-sm">
-              Spend {moneyExact(c.spend)}
-              {c.impressions != null ? ` · ${number(c.impressions)} impr` : ""}
-              {c.clicks != null ? ` · ${number(c.clicks)} taps` : ""}
-            </p>
-            {c.notes ? <p className="mt-2 text-sm leading-5 text-muted">{c.notes}</p> : null}
-          </Card>
+                <span>Brand — no location spend</span>
+              )
+            }
+            fields={[
+              { label: "Channel", value: platformLabel(c.channel) },
+              {
+                label: "Dates",
+                value: `${formatShortDate(c.startDate)}${c.endDate ? ` – ${formatShortDate(c.endDate)}` : ""}`,
+              },
+              { label: "Spend", value: moneyExact(c.spend) },
+              {
+                label: "Reach",
+                value: `${c.impressions != null ? number(c.impressions) : "—"} impr · ${c.clicks != null ? number(c.clicks) : "—"} taps`,
+              },
+            ]}
+          >
+            {c.notes ? <p className="text-sm leading-5 text-muted">{c.notes}</p> : null}
+          </RecordCard>
         ))}
       </main>
     </>

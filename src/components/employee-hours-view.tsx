@@ -1,7 +1,10 @@
+import { AlertCard } from "@/components/design/alert-card";
+import { formatSyncStamp } from "@/components/design/sync-status";
+import { StatPill } from "@/components/design/stat-pill";
 import { SyncHoursButton } from "@/components/sync-hours-button";
 import { TopBar } from "@/components/top-bar";
 import { LocationDot } from "@/components/ui";
-import { formatPhoenixDateTime, formatShortDate, formatTime, shiftIsoDate } from "@/lib/dates";
+import { formatShortDate, formatTime, shiftIsoDate } from "@/lib/dates";
 import { unpaidBreakNote, type EmployeeHoursLine, type EmployeeHoursView, type LocationHoursBlock } from "@/lib/employee-hours";
 import { moneyExact, pct } from "@/lib/format";
 import { LOCATIONS, type LocationScope } from "@/lib/location";
@@ -17,41 +20,33 @@ export function EmployeeHoursScreen({
   connected: boolean;
 }) {
   const syncedLabel = view.latestSyncedAt
-    ? `Last synced ${formatPhoenixDateTime(new Date(view.latestSyncedAt))}`
+    ? `Last synced: ${formatSyncStamp(new Date(view.latestSyncedAt))}`
     : connected
       ? "No pay periods synced yet"
       : "No hours on file";
 
   return (
     <>
-      <TopBar title="Employees" subtitle="Pay period hours by location" scope={scope} />
-      <main className="space-y-6 px-4 py-5">
-        <section className="overflow-hidden rounded-[1.75rem] bg-ink text-white shadow-[0_18px_40px_-24px_rgba(0,0,0,0.55)]">
-          <div className="flex items-center gap-3 px-4 py-3.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-chile">Chilakil Team</p>
-              <p className="mt-1 text-sm font-extrabold leading-snug">
-                {connected ? syncedLabel : "Not connected"}
-              </p>
-              {connected ? null : <p className="mt-0.5 text-xs text-white/70">{syncedLabel}</p>}
-            </div>
-            {connected ? <SyncHoursButton /> : null}
-          </div>
-          {connected ? null : (
-            <p className="px-4 pb-4 text-sm leading-5 text-white/75">
-              Set CHILAKIL_TEAM_API_KEY to pull hours from the team site. The base URL defaults to
-              https://team.chilakiltogo.com.
-            </p>
-          )}
-        </section>
+      <TopBar
+        title="Employees"
+        subtitle="Pay period hours by location"
+        scope={scope}
+        syncLabel={connected ? syncedLabel : "Not connected"}
+        syncAction={connected ? <SyncHoursButton /> : undefined}
+      />
+      <main className="space-y-6 px-4 py-5 md:px-6">
+        {connected ? null : (
+          <AlertCard tone="notice" title="Not connected">
+            Set CHILAKIL_TEAM_API_KEY to pull hours from the team site. The base URL defaults to
+            https://team.chilakiltogo.com. {syncedLabel}
+          </AlertCard>
+        )}
 
         <p className="px-1 text-sm leading-5 text-muted">
           Gross pay estimate excludes overtime, tips, and taxes. Labor % is that location&apos;s estimate
           divided by its Square sales for the same dates. Hours are read-only.
         </p>
-        {view.lastError ? (
-          <p className="rounded-2xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{view.lastError}</p>
-        ) : null}
+        {view.lastError ? <AlertCard tone="problem" title={view.lastError} /> : null}
 
         {view.periods.length === 0 ? (
           connected ? (
@@ -76,15 +71,17 @@ export function EmployeeHoursScreen({
                     Sunday–Saturday · each location is listed on its own.
                   </p>
                 </div>
-                {period.locations.map((block) => (
-                  <LocationBlock
-                    key={block.locationId}
-                    block={block}
-                    status={period.status}
-                    periodStart={period.periodStart}
-                    periodEnd={period.periodEnd}
-                  />
-                ))}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {period.locations.map((block) => (
+                    <LocationBlock
+                      key={block.locationId}
+                      block={block}
+                      status={period.status}
+                      periodStart={period.periodStart}
+                      periodEnd={period.periodEnd}
+                    />
+                  ))}
+                </div>
               </section>
             ))}
           </div>
@@ -116,7 +113,7 @@ function LocationBlock({
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
             <LocationDot id={block.locationId} />
-            <ReviewBadge pending={status === "pending"} />
+            <StatPill tone={status === "pending" ? "pending" : "ok"}>{status === "pending" ? "Pending" : "Approved"}</StatPill>
           </div>
           <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
             {index} / {place.typeLabel}
@@ -189,9 +186,11 @@ function EmployeeCard({
       ) : null}
 
       {openCount > 0 ? (
-        <p className="mt-3 inline-flex max-w-full items-center rounded-full bg-chile px-3 py-1.5 text-xs font-extrabold text-ink shadow-[0_8px_18px_-10px_rgba(255,198,69,0.95)]">
-          {openCount === 1 ? "Open shift" : `${openCount} open shifts`} · not counted
-        </p>
+        <div className="mt-3">
+          <StatPill tone="pending">
+            {openCount === 1 ? "Open shift" : `${openCount} open shifts`} · not counted
+          </StatPill>
+        </div>
       ) : null}
 
       {showPunches ? (
@@ -289,18 +288,6 @@ function Stat({ label, value }: { label: string; value: string }) {
         {value}
       </dd>
     </div>
-  );
-}
-
-function ReviewBadge({ pending }: { pending: boolean }) {
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-        pending ? "bg-chile text-ink" : "bg-sage-soft text-sage"
-      }`}
-    >
-      {pending ? "Pending" : "Approved"}
-    </span>
   );
 }
 

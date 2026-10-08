@@ -33,8 +33,8 @@ export function MoreScreen({ name, scope }: { name: string; scope: LocationScope
   return (
     <>
       <TopBar title="More" subtitle={name} scope={scope} />
-      <main className="space-y-7 px-4 py-5">
-        <article className="flex items-center gap-4 rounded-[1.75rem] bg-ink p-4 text-white shadow-[0_18px_40px_-24px_rgba(0,0,0,0.55)]">
+      <main className="space-y-7 px-4 py-5 md:px-6">
+        <article className="flex items-center gap-4 rounded-3xl border border-line bg-card p-4">
           <span
             aria-hidden
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-chile text-lg font-extrabold tracking-tight text-ink"
@@ -42,9 +42,9 @@ export function MoreScreen({ name, scope }: { name: string; scope: LocationScope
             {initials(name)}
           </span>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-chile">Owner</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted">Owner</p>
             <p className="truncate text-xl font-extrabold leading-tight">{name}</p>
-            <p className="mt-0.5 text-xs leading-5 text-white/70">{scopeLine(scope)}</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted">{scopeLine(scope)}</p>
           </div>
         </article>
 
@@ -53,7 +53,7 @@ export function MoreScreen({ name, scope }: { name: string; scope: LocationScope
         {SECTIONS.map((section) => (
           <section key={section.title}>
             <h2 className="px-1 text-[11px] font-bold uppercase tracking-[0.2em] text-muted">{section.title}</h2>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
               {section.hrefs.map((href, index) => {
                 const mod = byHref.get(href);
                 if (!mod) return null;

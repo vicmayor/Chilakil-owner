@@ -1,37 +1,21 @@
-import { COMBINED_BANNER, isCombinedScope, type LocationScope } from "@/lib/location";
-import { LocationSwitcher } from "@/components/location-switcher";
+import type { ReactNode } from "react";
+import { PageHeader } from "@/components/design/page-header";
+import type { LocationScope } from "@/lib/location";
 
 export function TopBar({
   title,
   subtitle,
   scope,
+  syncLabel,
+  syncAction,
 }: {
   title: string;
   subtitle?: string;
   scope: LocationScope;
+  syncLabel?: string;
+  syncAction?: ReactNode;
 }) {
   return (
-    <header
-      className="sticky top-0 z-20 border-b border-line bg-card px-4 pb-3"
-      style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}
-    >
-      <div className="mx-auto max-w-lg">
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted">
-          Chilakil Owner
-        </p>
-        <h1 className="font-display mt-0.5 text-2xl font-extrabold tracking-tight">{title}</h1>
-        {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
-        <div className="mt-3">
-          <LocationSwitcher value={scope} />
-        </div>
-        {isCombinedScope(scope) ? (
-          <p className="mt-2 text-[12px] leading-4 text-muted">{COMBINED_BANNER}</p>
-        ) : (
-          <p className="mt-2 text-[12px] leading-4 text-muted">
-            Showing this location only. The other store is hidden from these numbers.
-          </p>
-        )}
-      </div>
-    </header>
+    <PageHeader title={title} subtitle={subtitle} scope={scope} syncLabel={syncLabel} syncAction={syncAction} />
   );
 }

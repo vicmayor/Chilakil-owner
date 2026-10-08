@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { SearchField } from "@/components/design/search-field";
 import type { LocationScope } from "@/lib/location";
 
 type ChatTurn = { role: "user" | "assistant"; content: string };
@@ -87,11 +88,11 @@ export function AssistantChat({
           ask(input);
         }}
       >
-        <input
+        <SearchField
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask a question"
-          className="min-h-12 flex-1 rounded-full border border-line bg-card px-4 text-base outline-none ring-ink/20 focus:ring-2"
+          className="min-h-12 flex-1"
         />
         <button
           type="submit"

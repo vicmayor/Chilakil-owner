@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getLocationScope } from "@/lib/scope";
 import { locationIdsForScope } from "@/lib/location";
 import { relativeFromNow } from "@/lib/dates";
+import { RecordCard } from "@/components/design/record-card";
+import { StatPill } from "@/components/design/stat-pill";
 import { TopBar } from "@/components/top-bar";
 import { LocationDot } from "@/components/ui";
 import { MessageLangToggle } from "@/components/message-lang-toggle";
@@ -42,45 +43,35 @@ export default async function MessagesPage({
   return (
     <>
       <TopBar title={lang === "es" ? "Mensajes" : "Messages"} subtitle={copy.subtitle} scope={scope} />
-      <main className="space-y-3 px-4 py-4">
-        <MessageLangToggle lang={lang} />
-        {messages.map((m) => (
-          <Link
-            key={m.id}
-            href={`/messages/${m.id}?lang=${lang}`}
-            className="block rounded-2xl border border-line bg-card px-4 py-3"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <LocationDot id={m.locationId} />
-              <span className="text-[11px] font-bold uppercase text-muted">
-                {m.language} · {m.platform}
-              </span>
-            </div>
-            <p className="mt-1 font-semibold">{m.customerName}</p>
-            <p className="line-clamp-2 text-sm leading-5 text-muted">{m.body}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {m.sensitive ? (
-                <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10px] font-bold uppercase text-danger">
-                  {copy.sensitive}
-                </span>
-              ) : null}
-              {m.requiresOwnerApproval && m.status !== "sent" && m.status !== "rejected" ? (
-                <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold uppercase text-warn">
-                  {copy.approval}
-                </span>
-              ) : null}
-              {m.draftReply && m.status === "pending_approval" ? (
-                <span className="rounded-full bg-sage-soft px-2 py-0.5 text-[10px] font-bold uppercase text-sage">
-                  {copy.draft}
-                </span>
-              ) : null}
-              <span className="rounded-full bg-paper-2 px-2 py-0.5 text-[10px] font-bold uppercase text-muted">
-                {m.status.replace("_", " ")}
-              </span>
-              <span className="text-[11px] text-muted">{relativeFromNow(m.receivedAt)}</span>
-            </div>
-          </Link>
-        ))}
+      <main className="grid gap-3 px-4 py-4 md:grid-cols-2 md:px-6">
+        <div className="md:col-span-2">
+          <MessageLangToggle lang={lang} />
+        </div>
+        {messages.map((m) => {
+          const pending = m.requiresOwnerApproval && m.status !== "sent" && m.status !== "rejected";
+          return (
+            <RecordCard
+              key={m.id}
+              title={m.customerName}
+              kicker={<LocationDot id={m.locationId} />}
+              status={m.status.replaceAll("_", " ")}
+              statusTone={pending ? "pending" : "muted"}
+              href={`/messages/${m.id}?lang=${lang}`}
+              fields={[
+                { label: "Channel", value: m.platform },
+                { label: "When", value: relativeFromNow(m.receivedAt) },
+                { label: "Language", value: m.language },
+                { label: "Preview", value: m.body },
+              ]}
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {m.sensitive ? <StatPill tone="pending">{copy.sensitive}</StatPill> : null}
+                {pending ? <StatPill tone="pending">{copy.approval}</StatPill> : null}
+                {m.draftReply && m.status === "pending_approval" ? <StatPill tone="ok">{copy.draft}</StatPill> : null}
+              </div>
+            </RecordCard>
+          );
+        })}
       </main>
     </>
   );

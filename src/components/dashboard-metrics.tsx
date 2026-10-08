@@ -2,7 +2,6 @@ import { CombinedBadge, LocationDot, Metric, SampleBadge } from "@/components/ui
 import { money, moneyExact, number, pct } from "@/lib/format";
 import type { DashboardData, LocationMetrics } from "@/lib/metrics";
 import { isCombinedScope } from "@/lib/location";
-import { formatPhoenixDateTime } from "@/lib/dates";
 
 function Block({ m, combined = false }: { m: LocationMetrics; combined?: boolean }) {
   const laborTone = m.laborPct > m.targetLaborPct ? "warn" : "good";
@@ -46,29 +45,22 @@ function Block({ m, combined = false }: { m: LocationMetrics; combined?: boolean
 }
 
 export function DashboardMetrics({ data }: { data: DashboardData }) {
-  const stamp = (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-      {data.sample ? <SampleBadge /> : null}
-      <p className="text-sm text-muted">
-        {data.updatedAt
-          ? `Last updated ${formatPhoenixDateTime(new Date(data.updatedAt))}`
-          : "No daily sales import for this date"}
-      </p>
-    </div>
-  );
+  const sample = data.sample ? <SampleBadge /> : null;
 
   if (isCombinedScope(data.scope) && data.combined) {
     return (
       <div className="space-y-3">
-        {stamp}
-        <div className="rounded-2xl border border-chile bg-card p-4">
+        {sample}
+        <div className="rounded-3xl border border-ink bg-card p-4 md:col-span-2">
           <Block m={data.combined} combined />
         </div>
-        {data.locations.map((m) => (
-          <div key={m.locationId} className="rounded-2xl border border-line bg-card p-4">
-            <Block m={m} />
-          </div>
-        ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          {data.locations.map((m) => (
+            <div key={m.locationId} className="rounded-3xl border border-line bg-card p-4">
+              <Block m={m} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -77,8 +69,8 @@ export function DashboardMetrics({ data }: { data: DashboardData }) {
   if (!m) return <p className="text-sm text-muted">No sales for this date.</p>;
   return (
     <div className="space-y-3">
-      {stamp}
-      <div className="rounded-2xl border border-line bg-card p-4">
+      {sample}
+      <div className="rounded-3xl border border-line bg-card p-4">
         <Block m={m} />
       </div>
     </div>

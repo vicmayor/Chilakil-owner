@@ -1,6 +1,7 @@
 import { getLocationScope } from "@/lib/scope";
 import { getAlerts, getDashboardData } from "@/lib/metrics";
 import { formatLongDate } from "@/lib/dates";
+import { formatSyncStamp } from "@/components/design/sync-status";
 import { TopBar } from "@/components/top-bar";
 import { DashboardMetrics } from "@/components/dashboard-metrics";
 import { AlertList } from "@/components/alert-list";
@@ -14,8 +15,17 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <TopBar title="Today" subtitle={formatLongDate(data.date)} scope={scope} />
-      <main className="space-y-5 px-4 py-4">
+      <TopBar
+        title="Today"
+        subtitle={formatLongDate(data.date)}
+        scope={scope}
+        syncLabel={
+          data.updatedAt
+            ? `Last synced: ${formatSyncStamp(new Date(data.updatedAt))}`
+            : "No daily sales import for this date"
+        }
+      />
+      <main className="space-y-5 px-4 py-4 md:px-6">
         <DashboardMetrics data={data} />
         <section>
           <h2 className="mb-2 text-sm font-semibold">Alerts</h2>

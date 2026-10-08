@@ -99,7 +99,7 @@ export default async function FoodCostPage() {
         subtitle={`Menu costing · target from the workbook · ${phoenixToday()}`}
         scope={scope}
       />
-      <main className="space-y-4 px-4 py-4">
+      <main className="space-y-4 px-4 py-4 md:px-6">
         {isCombinedScope(scope) && data.combined ? (
           <Card>
             <CombinedBadge />

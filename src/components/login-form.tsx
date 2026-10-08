@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import type { loginAction } from "@/app/actions/auth";
+import { SearchField } from "@/components/design/search-field";
 
 type Props = {
   action: typeof loginAction;
@@ -14,23 +15,23 @@ export function LoginForm({ action }: Props) {
     <form action={formAction} className="mt-8 space-y-4">
       <label className="block">
         <span className="text-sm font-medium">Email</span>
-        <input
+        <SearchField
           name="email"
           type="email"
           autoComplete="username"
           required
           defaultValue="owner@chilakil.com"
-          className="mt-1.5 w-full rounded-full border border-line bg-card px-4 text-base outline-none ring-ink/20 focus:ring-2"
+          className="mt-1.5"
         />
       </label>
       <label className="block">
         <span className="text-sm font-medium">Password</span>
-        <input
+        <SearchField
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className="mt-1.5 w-full rounded-full border border-line bg-card px-4 text-base outline-none ring-ink/20 focus:ring-2"
+          className="mt-1.5"
         />
       </label>
       {state?.error ? (
@@ -41,7 +42,7 @@ export function LoginForm({ action }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="flex w-full items-center justify-center rounded-full bg-chile px-4 text-base font-bold text-ink disabled:opacity-60"
+        className="flex w-full items-center justify-center rounded-2xl bg-ink px-4 text-base font-extrabold text-white disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
