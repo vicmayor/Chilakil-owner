@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
 import { getLocationScope } from "@/lib/scope";
-import { locationIdsForScope } from "@/lib/location";
+import { LOCATIONS, isLocationId, locationIdsForScope } from "@/lib/location";
 import { moneyExact, pct } from "@/lib/format";
 import { menuUnitCost, pricedRecipeCost } from "@/lib/food-cost";
+import { Accordion } from "@/components/design/accordion";
 import { TopBar } from "@/components/top-bar";
 import { Card, LocationDot } from "@/components/ui";
-
 export const metadata = { title: "Menu & Recipes" };
 
 function moneyOrBlank(amount: number | null): string {
@@ -31,15 +31,22 @@ export default async function MenuPage() {
   return (
     <>
       <TopBar title="Menu & recipes" subtitle="Each kitchen has its own costing" scope={scope} />
-      <main className="space-y-4 px-4 py-4">
+      <main className="space-y-4 px-4 py-4 md:grid md:grid-cols-2 md:px-6">
         {ids.map((id) => {
           const locRecipes = recipes.filter((r) => r.locationId === id);
           const locIng = lowStock.filter((i) => i.locationId === id);
+          const lowCount = locIng.filter((ing) => ing.reorderPoint > 0 && ing.onHand <= ing.reorderPoint).length;
           return (
-            <div key={id} className="space-y-3">
-              <h2 className="px-1 text-sm font-semibold">
+            <Accordion
+              key={id}
+              title={isLocationId(id) ? LOCATIONS[id].name : id}
+              count={locRecipes.length}
+              pending={lowCount}
+              defaultOpen
+            >
+              <div className="mb-3">
                 <LocationDot id={id} />
-              </h2>
+              </div>
               {locRecipes.map((recipe) => {
                 const cost = pricedRecipeCost(
                   recipe.ingredients.map((line) => ({
@@ -113,7 +120,7 @@ export default async function MenuPage() {
                   <p className="mt-2 text-sm text-muted">No on-hand counts for this kitchen.</p>
                 ) : null}
               </Card>
-            </div>
+            </Accordion>
           );
         })}
       </main>

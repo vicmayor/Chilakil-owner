@@ -7,12 +7,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-paper px-5 pb-[env(safe-area-inset-bottom)] pt-[max(2.5rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-muted">
-          Chilakil To Go
-        </p>
-        <h1 className="font-display mt-2 text-4xl font-extrabold tracking-tight">
-          Owner
-        </h1>
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-muted">Chilakil / Owner</p>
+        <h1 className="font-display mt-2 text-6xl font-black uppercase leading-[0.86] tracking-tight">Welcome</h1>
         <p className="mt-3 max-w-sm text-[15px] leading-6 text-muted">
           Glendale restaurant and Avondale trailer stay on separate books. Sign
           in to see today.

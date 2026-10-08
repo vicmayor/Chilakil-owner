@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/db";
 import { getLocationScope } from "@/lib/scope";
-import { locationIdsForScope, isCombinedScope, COMBINED_LABEL } from "@/lib/location";
+import { locationIdsForScope, isCombinedScope, COMBINED_LABEL, LOCATIONS, isLocationId } from "@/lib/location";
 import { phoenixToday, formatShortDate } from "@/lib/dates";
 import { expenseCategoryLabel, moneyExact } from "@/lib/format";
+import { Accordion } from "@/components/design/accordion";
 import { TopBar } from "@/components/top-bar";
 import { Card, CombinedBadge, LocationDot } from "@/components/ui";
 
@@ -23,7 +24,7 @@ export default async function ExpensesPage() {
   return (
     <>
       <TopBar title="Expenses" subtitle="Books by location — never mixed unless ALL" scope={scope} />
-      <main className="space-y-4 px-4 py-4">
+      <main className="space-y-4 px-4 py-4 md:px-6">
         <Card>
           {isCombinedScope(scope) ? <CombinedBadge /> : <LocationDot id={ids[0]} />}
           <p className="font-display mt-2 text-3xl font-extrabold tabular">{moneyExact(todayTotal)}</p>
@@ -37,12 +38,17 @@ export default async function ExpensesPage() {
           const rows = expenses.filter((e) => e.locationId === id);
           const sum = rows.reduce((s, e) => s + e.amount, 0);
           return (
-            <Card key={id}>
-              <div className="flex items-center justify-between">
+            <Accordion
+              key={id}
+              title={isLocationId(id) ? LOCATIONS[id].name : id}
+              count={rows.length}
+              defaultOpen
+            >
+              <div className="mb-2 flex items-center justify-between">
                 <LocationDot id={id} />
-                <span className="tabular text-sm font-semibold">{moneyExact(sum)}</span>
+                <span className="tabular text-sm font-extrabold">{moneyExact(sum)}</span>
               </div>
-              <ul className="mt-2 divide-y divide-line">
+              <ul className="divide-y divide-line">
                 {rows.map((e) => (
                   <li key={e.id} className="flex items-start justify-between gap-3 py-2.5">
                     <div>
@@ -61,7 +67,7 @@ export default async function ExpensesPage() {
                   </li>
                 ))}
               </ul>
-            </Card>
+            </Accordion>
           );
         })}
       </main>

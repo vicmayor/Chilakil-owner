@@ -1,6 +1,7 @@
+import { formatSyncStamp } from "@/components/design/sync-status";
 import { TopBar } from "@/components/top-bar";
 import { Card, CombinedBadge, LocationDot, SampleBadge } from "@/components/ui";
-import { formatPhoenixDateTime, formatShortDate } from "@/lib/dates";
+import { formatShortDate } from "@/lib/dates";
 import { channelLabel, moneyExact, number, pct } from "@/lib/format";
 import { isCombinedScope, type LocationId, type LocationScope } from "@/lib/location";
 import { grossChange, type LocationDay, type SalesView } from "@/lib/sales-view";
@@ -14,16 +15,18 @@ export function SalesDashboard({ view, scope }: { view: SalesView; scope: Locati
 
   return (
     <>
-      <TopBar title="Sales" subtitle={subtitle} scope={scope} />
-      <main className="space-y-4 px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {view.sampleOnFeatured || view.anySample ? <SampleBadge /> : null}
-          <p className="text-sm text-muted">
-            {view.latestImportAt
-              ? `Last updated ${formatPhoenixDateTime(new Date(view.latestImportAt))}`
-              : "No import timestamp"}
-          </p>
-        </div>
+      <TopBar
+        title="Sales"
+        subtitle={subtitle}
+        scope={scope}
+        syncLabel={
+          view.latestImportAt
+            ? `Last synced: ${formatSyncStamp(new Date(view.latestImportAt))}`
+            : "No import timestamp"
+        }
+      />
+      <main className="space-y-4 px-4 py-4 md:px-6">
+        {view.sampleOnFeatured || view.anySample ? <SampleBadge /> : null}
 
         {!view.featuredDate ? (
           <Card>
