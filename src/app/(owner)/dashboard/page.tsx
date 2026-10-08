@@ -5,6 +5,8 @@ import { formatSyncStamp } from "@/components/design/sync-status";
 import { TopBar } from "@/components/top-bar";
 import { DashboardMetrics } from "@/components/dashboard-metrics";
 import { AlertList } from "@/components/alert-list";
+import { InventoryWatch } from "@/components/inventory-watch";
+import { loadInventoryWatch } from "@/lib/team-inventory-load";
 
 export const metadata = { title: "Dashboard" };
 
@@ -12,6 +14,7 @@ export default async function DashboardPage() {
   const scope = await getLocationScope();
   const data = await getDashboardData(scope);
   const alerts = await getAlerts(scope, data.date);
+  const inventory = await loadInventoryWatch(scope);
 
   return (
     <>
@@ -27,6 +30,7 @@ export default async function DashboardPage() {
       />
       <main className="space-y-5 px-4 py-4 md:px-6">
         <DashboardMetrics data={data} />
+        <InventoryWatch rows={inventory} />
         <section>
           <h2 className="mb-2 text-sm font-semibold">Alerts</h2>
           <AlertList alerts={alerts} />

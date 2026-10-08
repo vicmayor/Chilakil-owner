@@ -129,11 +129,29 @@ with `Authorization: Bearer $CHILAKIL_TEAM_API_KEY`. The key is not put in the U
 
 Rows are stored per employee id, location, and period. Each day can contain several shift segments, keyed by `shiftId` and date. Hours keep up to six decimals. `unpaidBreakMinutes` is already deducted from `hours`. An empty `breaks` array with `breakTimesRecorded: false` is not “no break”. Open shifts have `clockOut: null` and `hours: 0`; they are listed and not counted. `grossPayEstimate` and `appliedHourlyRates` are stored as Team sent them. Approval status is for the whole period and covers both locations. The same employee id may have a row at both locations. ALL shows those locations as separate labeled blocks. Labor % is that location’s gross pay estimate divided by its Square gross for the same dates. The estimate excludes overtime, tips, and taxes.
 
-The sync route is for cron. It accepts `Authorization: Bearer $CRON_SECRET` or `Authorization: Bearer $INGEST_TOKEN`. It does not use the team token as its own password.
+The sync route is for cron. It accepts `Authorization: Bearer $CRON_SECRET` or `Authorization: Bearer $INGEST_TOKEN`. It does not use the team token as its own password. The same request also pulls inventory and adds an `inventory` object to the JSON. Hours still succeed if inventory is forbidden.
 
 ```bash
 curl -X POST -H "Authorization: Bearer $INGEST_TOKEN" "$APP_URL/api/sync/employee-hours"
 ```
+
+## Inventory
+
+The Inventory screen is a read-only copy of the current Chilakil Team catalog. It uses the same `CHILAKIL_TEAM_API_KEY` and base URL as hours. Team must also have `inventory:read` turned on for that key (Team → Owner API). A valid hours key without that permission returns 403. The screen then keeps the last good report and shows: Activa el permiso de inventario en Team → Owner API.
+
+Sync now, `POST /api/sync/inventory`, and the hours sync route read:
+
+`GET {base}/api/v1/inventory?location=glendale|avondale|all`
+
+There is no pay period. `generatedAt` is the report time, not the last count. A successful response replaces only the locations in that response. Syncing Glendale does not delete Avondale. Unknown quantities stay null and show as Sin contar. Pound quantities are already in pounds. Summary chips can overlap, and ALL shows two labeled blocks.
+
+`401`, `403`, `400`, `405`, `503`, and network errors leave the last rows in place.
+
+```bash
+curl -X POST -H "Authorization: Bearer $INGEST_TOKEN" "$APP_URL/api/sync/inventory"
+```
+
+On production, apply the inventory tables with `npx prisma migrate deploy` before the first sync. The migration is `20261008100000_team_inventory`.
 
 ## Food cost workbook
 

@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-10-08T10:00:00-07:00",
+  "timezone": "America/Phoenix",
+  "locations": [
+    {
+      "location": "glendale",
+      "items": [
+        {
+          "id": "bistro-bags-13",
+          "name": "Bistro Bags 13″",
+          "nameEn": "13″ Bistro Bags",
+          "category": "supplies",
+          "unit": "piece",
+          "unitLabel": null,
+          "supplier": null,
+          "quantityOnHand": 24,
+          "status": "low",
+          "lowStock": true,
+          "parLevel": null,
+          "minimumLevel": null,
+          "unitCost": null,
+          "purchase": "needed",
+          "deliveryStatus": null,
+          "neededBy": "tomorrow",
+          "neededDate": "2026-10-09",
+          "lastCountedAt": "2026-10-08T09:00:00-07:00",
+          "lastCountedBy": null,
+          "lastUpdatedAt": "2026-10-08T09:05:00-07:00",
+          "lastUpdatedBy": null
+        }
+      ],
+      "summary": {
+        "out": 0,
+        "low": 1,
+        "toBuy": 1,
+        "onTheWay": 0,
+        "unreviewed": 0
+      }
+    },
+    {
+      "location": "avondale",
+      "items": [
+        {
+          "id": "bistro-bags-13",
+          "name": "Bistro Bags 13″",
+          "nameEn": "13″ Bistro Bags",
+          "category": "supplies",
+          "unit": null,
+          "unitLabel": null,
+          "supplier": null,
+          "quantityOnHand": null,
+          "status": "unreviewed",
+          "lowStock": false,
+          "parLevel": null,
+          "minimumLevel": null,
+          "unitCost": null,
+          "purchase": null,
+          "deliveryStatus": null,
+          "neededBy": null,
+          "neededDate": null,
+          "lastCountedAt": null,
+          "lastCountedBy": null,
+          "lastUpdatedAt": null,
+          "lastUpdatedBy": null
+        }
+      ],
+      "summary": {
+        "out": 0,
+        "low": 0,
+        "toBuy": 0,
+        "onTheWay": 0,
+        "unreviewed": 1
+      }
+    }
+  ]
+}
