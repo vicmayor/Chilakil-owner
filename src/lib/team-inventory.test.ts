@@ -12,6 +12,7 @@ import {
   formatInventorySyncedAt,
   groupInventoryByCategory,
   inventoryActionAlert,
+  inventorySyncIsFresh,
   itemIsPending,
   neededDatePresentation,
   quantityLabel,
@@ -218,4 +219,50 @@ test("the inventory client uses the shared key and does not put it in the URL", 
   assert.equal(`${seenAuthorization}`, "Bearer live-key");
   assert.equal(seenUrl.includes("live-key"), false);
   assert.match(INVENTORY_FORBIDDEN_HINT, /Activa el permiso de inventario/);
+});
+
+test("a clean sync under 60 seconds is fresh and a stale row is not", () => {
+  const now = new Date("2026-10-08T10:00:00-07:00");
+  const recent = new Date(now.getTime() - 30_000);
+  const old = new Date(now.getTime() - 61_000);
+  assert.equal(inventorySyncIsFresh(recent, null, now, 60_000), true);
+  assert.equal(inventorySyncIsFresh(old, null, now, 60_000), false);
+  assert.equal(inventorySyncIsFresh(recent, "Team inventory is temporarily unavailable.", now, 60_000), false);
+  assert.equal(inventorySyncIsFresh(null, null, now, 60_000), false);
+});
+
+test("the page timeout aborts the inventory request", async () => {
+  let aborted = false;
+  const client = createTeamInventoryClient(
+    { CHILAKIL_TEAM_API_KEY: "live-key" },
+    (_url, init) =>
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error("missing signal"));
+          return;
+        }
+        const fail = () => {
+          aborted = true;
+          const error = new Error("timeout");
+          error.name = "TimeoutError";
+          reject(error);
+        };
+        if (signal.aborted) fail();
+        else signal.addEventListener("abort", fail);
+      }),
+    50,
+  );
+  assert.ok(client);
+  const settled = client.fetchInventory("all").then(
+    () => "ok",
+    (error: unknown) => error,
+  );
+  const result = await Promise.race([
+    settled,
+    new Promise((resolve) => setTimeout(() => resolve("still-open"), 200)),
+  ]);
+  assert.ok(result instanceof Error);
+  assert.equal(result.name, "TimeoutError");
+  assert.equal(aborted, true);
 });

@@ -139,6 +139,10 @@ curl -X POST -H "Authorization: Bearer $INGEST_TOKEN" "$APP_URL/api/sync/employe
 
 The Inventory screen is a read-only copy of the current Chilakil Team catalog. It uses the same `CHILAKIL_TEAM_API_KEY` and base URL as hours. Team must also have `inventory:read` turned on for that key (Team → Owner API). A valid hours key without that permission returns 403. The screen then keeps the last good report and shows: Activa el permiso de inventario en Team → Owner API.
 
+Opening `/inventory`, reloading that page, and the nav Refresh button on that page pull Team on the server before the screen renders. That pull times out after 8 seconds. If the last successful sync is under 60 seconds old and is not stale, the page skips the network and shows the stored rows. A timeout, `401`, `403`, `400`, `405`, `503`, or network error leaves those rows in place, keeps the previous Last synced time, and marks the screen stale.
+
+Sync now and `POST /api/sync/inventory` always call Team. They are not on the 60-second skip. Run the POST every 15 minutes during the day from an external scheduler. This app does not start that schedule.
+
 Sync now, `POST /api/sync/inventory`, and the hours sync route read:
 
 `GET {base}/api/v1/inventory?location=glendale|avondale|all`

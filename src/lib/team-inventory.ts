@@ -116,6 +116,21 @@ export function neededByLabel(neededBy: InventoryNeededBy): string | null {
   return neededBy ? NEEDED_BY_LABELS[neededBy] : null;
 }
 
+/**
+ * A page-open pull can skip the network when the last success is still inside
+ * minIntervalMs and that sync is not marked stale. A stale row is never fresh.
+ */
+export function inventorySyncIsFresh(
+  lastSuccessAt: Date | null,
+  lastError: string | null,
+  now: Date,
+  minIntervalMs: number,
+): boolean {
+  if (lastError) return false;
+  if (!lastSuccessAt) return false;
+  return now.getTime() - lastSuccessAt.getTime() < minIntervalMs;
+}
+
 /** toBuy is need action, onTheWay is awaiting delivery, out is out of stock. Counts are not added together. */
 export function inventoryActionAlert(summary: Pick<MappedInventorySummary, "toBuy" | "onTheWay" | "out">): {
   headline: string;

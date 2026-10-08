@@ -13,6 +13,12 @@ type TeamInventoryEnv = {
   [key: string]: string | undefined;
 };
 
+/** Page-open pulls use a short timeout so a hung Team response does not hold the screen. */
+export const INVENTORY_LIVE_TIMEOUT_MS = 8_000;
+
+/** Skip a page-open pull when the last clean sync is newer than this. */
+export const INVENTORY_SYNC_FRESH_MS = 60_000;
+
 export class TeamInventoryApiError extends Error {
   readonly status: number;
 
@@ -35,6 +41,7 @@ export function teamInventoryConfigured(env: TeamInventoryEnv = process.env): bo
 export function createTeamInventoryClient(
   env: TeamInventoryEnv = process.env,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs = 20_000,
 ): TeamInventoryClient | null {
   const baseUrl = readTeamBaseUrl(env);
   const token = readTeamApiKey(env);
@@ -51,7 +58,7 @@ export function createTeamInventoryClient(
           authorization: `Bearer ${token}`,
         },
         cache: "no-store",
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) throw new TeamInventoryApiError(response.status);
       return response.json() as Promise<unknown>;

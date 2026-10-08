@@ -194,6 +194,60 @@ test("403 and 503 keep the last inventory and record the permission hint", async
   assert.equal(afterItems.length, 6);
 });
 
+test("a fresh page-open pull skips Team and a timeout keeps the stored rows", async () => {
+  await cleanup();
+  const first = await syncTeamInventory({ client: clientFor(richFixture), location: "all" });
+  assert.equal(first.ok, true);
+  let calls = 0;
+  const counting: TeamInventoryClient = {
+    async fetchInventory() {
+      calls += 1;
+      return richFixture;
+    },
+  };
+  const skipped = await syncTeamInventory({ client: counting, location: "all", minIntervalMs: 60_000 });
+  assert.equal(skipped.ok, true);
+  assert.equal(skipped.skipped, true);
+  assert.equal(calls, 0);
+
+  await prisma.teamInventorySyncState.update({
+    where: { id: "default" },
+    data: { lastError: "stale", lastStatus: 503 },
+  });
+  const retried = await syncTeamInventory({ client: counting, location: "all", minIntervalMs: 60_000 });
+  assert.equal(retried.skipped, undefined);
+  assert.equal(calls, 1);
+
+  await prisma.teamInventorySyncState.update({
+    where: { id: "default" },
+    data: { lastSuccessAt: new Date(Date.now() - 120_000), lastError: null, lastStatus: null },
+  });
+  const again = await syncTeamInventory({ client: counting, location: "all", minIntervalMs: 60_000 });
+  assert.equal(again.ok, true);
+  assert.equal(again.skipped, undefined);
+  assert.equal(calls, 2);
+
+  await prisma.teamInventorySyncState.update({
+    where: { id: "default" },
+    data: { lastSuccessAt: new Date(Date.now() - 120_000), lastError: null, lastStatus: null },
+  });
+  const before = await prisma.teamInventoryItem.count();
+  const timedOut: TeamInventoryClient = {
+    async fetchInventory() {
+      const error = new Error("The operation was aborted due to timeout");
+      error.name = "TimeoutError";
+      throw error;
+    },
+  };
+  const failed = await syncTeamInventory({ client: timedOut, location: "all", minIntervalMs: 60_000 });
+  assert.equal(failed.ok, false);
+  assert.match(failed.error ?? "", /Couldn't reach the Team API/);
+  assert.equal(await prisma.teamInventoryItem.count(), before);
+  const state = await prisma.teamInventorySyncState.findUnique({ where: { id: "default" } });
+  assert.ok(state?.lastError);
+  assert.ok(state.lastSuccessAt);
+});
+
 test("inventory sync route requires a bearer token and stays disconnected without a team key", async () => {
   await cleanup();
   process.env.INGEST_TOKEN = process.env.INGEST_TOKEN || "upsert-test-token";

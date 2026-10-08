@@ -1,6 +1,9 @@
 import { bearerMatches } from "@/lib/ingest";
 import { syncTeamInventory } from "@/lib/team-inventory-sync";
 
+// External schedulers should POST here about every 15 minutes during the day.
+// This route always calls Team. The inventory page applies the 60-second skip.
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {

@@ -1,9 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { LocationId } from "@/lib/location";
-import { INVENTORY_FORBIDDEN_HINT } from "@/lib/team-inventory";
+import { INVENTORY_FORBIDDEN_HINT, inventorySyncIsFresh } from "@/lib/team-inventory";
 import {
   createTeamInventoryClient,
+  INVENTORY_LIVE_TIMEOUT_MS,
+  INVENTORY_SYNC_FRESH_MS,
   TeamInventoryApiError,
   type TeamInventoryClient,
   type TeamInventoryLocationQuery,
@@ -20,6 +22,8 @@ export type SyncTeamInventoryResult = {
   ok: boolean;
   connected: boolean;
   counts: { locationId: LocationId; items: number }[];
+  /** True when a recent clean sync made this pull skip the network. */
+  skipped?: boolean;
   error?: string;
   status?: number;
 };
@@ -31,11 +35,27 @@ export type SyncTeamInventoryResult = {
 export async function syncTeamInventory(options?: {
   client?: TeamInventoryClient | null;
   location?: TeamInventoryLocationQuery;
+  /** When set, skip the network if the last clean success is newer than this. */
+  minIntervalMs?: number;
 }): Promise<SyncTeamInventoryResult> {
   const client = options && "client" in options ? options.client : createTeamInventoryClient();
   const location = options?.location ?? "all";
   if (!client) {
     return { ok: false, connected: false, counts: [] };
+  }
+
+  if (options?.minIntervalMs != null) {
+    const state = await prisma.teamInventorySyncState.findUnique({ where: { id: SYNC_STATE_ID } });
+    if (
+      inventorySyncIsFresh(
+        state?.lastSuccessAt ?? null,
+        state?.lastError ?? null,
+        new Date(),
+        options.minIntervalMs,
+      )
+    ) {
+      return { ok: true, connected: true, counts: [], skipped: true };
+    }
   }
 
   try {
@@ -55,6 +75,25 @@ export async function syncTeamInventory(options?: {
       error: retained.message,
       status: retained.status ?? undefined,
     };
+  }
+}
+
+/**
+ * Live pull for opening /inventory and for a full page reload, including nav Refresh.
+ * Uses a short timeout. Skips the network when the last clean sync is under a minute old.
+ * Failures leave the stored rows and are recorded as stale.
+ */
+export async function refreshInventoryOnView(): Promise<SyncTeamInventoryResult> {
+  try {
+    const client = createTeamInventoryClient(process.env, fetch, INVENTORY_LIVE_TIMEOUT_MS);
+    return await syncTeamInventory({
+      client,
+      location: "all",
+      minIntervalMs: INVENTORY_SYNC_FRESH_MS,
+    });
+  } catch (error) {
+    console.error("Inventory refresh failed", error instanceof Error ? error.message : "unknown");
+    return { ok: false, connected: true, counts: [], error: "Couldn't sync inventory." };
   }
 }
 

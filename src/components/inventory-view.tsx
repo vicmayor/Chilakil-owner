@@ -54,7 +54,9 @@ export function InventoryScreen({
                 className={`inline-block h-2.5 w-2.5 rounded-full ${data.lastSuccessAt && !data.stale ? "bg-sage" : "bg-mesa"}`}
                 aria-hidden
               />
-              {data.lastSuccessAt ? formatInventorySyncedAt(data.lastSuccessAt) : "Not synced yet"}
+              {data.lastSuccessAt
+                ? `${formatInventorySyncedAt(data.lastSuccessAt)}${data.stale ? " · stale" : ""}`
+                : "Not synced yet"}
             </p>
             {connected ? <SyncInventoryButton /> : null}
           </div>
