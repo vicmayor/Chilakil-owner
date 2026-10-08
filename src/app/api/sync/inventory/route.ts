@@ -1,6 +1,8 @@
 import { bearerMatches } from "@/lib/ingest";
-import { syncTeamHours } from "@/lib/team-hours-sync";
 import { syncTeamInventory } from "@/lib/team-inventory-sync";
+
+// External schedulers should POST here about every 15 minutes during the day.
+// This route always calls Team. The inventory page applies the 60-second skip.
 
 export const dynamic = "force-dynamic";
 
@@ -18,24 +20,14 @@ async function handle(request: Request) {
   }
 
   try {
-    const result = await syncTeamHours();
-    const inventory = await syncInventoryAttachment();
-    if (!result.connected) {
-      return Response.json({ ok: false, connected: false, upserted: 0, periods: 0, inventory });
-    }
-    return Response.json({ ...result, inventory });
-  } catch (error) {
-    console.error("Employee hours sync failed", error instanceof Error ? error.message : "unknown");
-    return Response.json({ ok: false, connected: true, error: "Couldn't sync hours." }, { status: 502 });
-  }
-}
-
-async function syncInventoryAttachment() {
-  try {
-    return await syncTeamInventory();
+    const result = await syncTeamInventory();
+    return Response.json(result);
   } catch (error) {
     console.error("Inventory sync failed", error instanceof Error ? error.message : "unknown");
-    return { ok: false, connected: true, counts: [], error: "Couldn't sync inventory." };
+    return Response.json(
+      { ok: false, connected: true, counts: [], error: "Couldn't sync inventory." },
+      { status: 502 },
+    );
   }
 }
 

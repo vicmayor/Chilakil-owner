@@ -66,6 +66,14 @@ export function createTeamHoursClient(
   };
 }
 
+export function readTeamApiKey(env: TeamHoursEnv = process.env): string | null {
+  return teamApiKey(env);
+}
+
+export function readTeamBaseUrl(env: TeamHoursEnv = process.env): string | null {
+  return resolveBaseUrl(env.CHILAKIL_TEAM_API_URL);
+}
+
 function teamApiKey(env: TeamHoursEnv): string | null {
   const key = env.CHILAKIL_TEAM_API_KEY?.trim();
   if (key) return key;

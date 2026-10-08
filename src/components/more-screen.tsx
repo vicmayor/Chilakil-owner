@@ -6,7 +6,7 @@ import { MODULES, type AppModule } from "@/lib/nav";
 
 const SECTIONS: { title: string; hrefs: string[] }[] = [
   { title: "Sales & Delivery", hrefs: ["/sales", "/doordash", "/ubereats", "/grubhub"] },
-  { title: "Kitchen & Costs", hrefs: ["/expenses", "/food-cost", "/menu"] },
+  { title: "Kitchen & Costs", hrefs: ["/expenses", "/food-cost", "/inventory", "/menu"] },
   { title: "Customers & Marketing", hrefs: ["/messages", "/reviews", "/marketing"] },
   { title: "Team", hrefs: ["/employees", "/assistant"] },
 ];

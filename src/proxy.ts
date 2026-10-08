@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
     pathname === "/icon" ||
     pathname === "/apple-icon" ||
     pathname.startsWith("/api/ingest/") ||
-    pathname === "/api/sync/employee-hours";
+    pathname === "/api/sync/employee-hours" ||
+    pathname === "/api/sync/inventory";
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySessionToken(token) : null;
