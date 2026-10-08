@@ -165,10 +165,20 @@ The Food Cost screen reads `Ingredient`, `Recipe`, `RecipeIngredient`, and `Menu
 
 `npx prisma db seed` refreshes that import even when `SEED_SAMPLE` is unset. Each workbook row has a stable `sourceKey` per location. Re-running updates those ingredients, recipes, and menu items and replaces their recipe lines. It does not insert a second copy, and it leaves other menu rows (the sample menu) in place.
 
+Production can load the same workbook without resetting the owner password or demo sales:
+
+```bash
+npm run food-cost:import
+```
+
+That command upserts Glendale and Avondale separately from `data/chilakil-to-go-food-cost.xlsx`. The sheet is not location-specific, so both kitchens receive the same numbers. It does not combine them. Pass another xlsx path as the first argument to import a different file. `DATABASE_URL` is required. `OWNER_EMAIL` and `OWNER_PASSWORD` are not.
+
+Recipe Costing names Breakfast Burrito, Chorizo & Egg Burrito, Torta de Chilaquiles, Keto Chilaquiles, and Breakfast Bowl, but those rows have an empty ingredient cell. Menu Summary either omits Breakfast Burrito or fills the sell price with a formula that returns $0. The importer keeps those items and leaves the price and food cost blank. It does not invent a recipe. OG Breakfast Burrito is a different row and is fully costed.
+
 When Victor updates the Excel file:
 
 1. Replace `data/chilakil-to-go-food-cost.xlsx` with the new workbook. Keep the sheet names Ingredient Prices, Recipe Costing, Menu Summary, and How to Use.
-2. From the repo root, with `DATABASE_URL`, `DIRECT_URL`, `OWNER_EMAIL`, and `OWNER_PASSWORD` set, run `npx prisma db seed`.
+2. From the repo root, with `DATABASE_URL` set, run `npm run food-cost:import`. `npx prisma db seed` also refreshes the workbook, and it updates the owner password when `OWNER_PASSWORD` is set.
 
 Menu summary food cost uses the recipe sheet’s line costs, including the cached $0 to-go box line. Base cost with onion and cilantro uses the ingredient price list, so that box is included at its list price. The target is the Menu Summary “TARGET FOOD COST” cell (30%).
 
