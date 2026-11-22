@@ -19,8 +19,8 @@ export function formatSyncStamp(date: Date): string {
 export function SyncStatus({ label, action }: { label: string; action?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <p className="flex min-w-0 items-center gap-2 text-sm text-muted">
-        <span className="h-2 w-2 shrink-0 rounded-full bg-sage" aria-hidden />
+      <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-ink/80">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-ink" aria-hidden />
         <span className="truncate">{label}</span>
       </p>
       {action ? <div className="shrink-0">{action}</div> : null}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
+import { FaceIdOffer } from "@/components/face-id-offer";
 import { TopBar } from "@/components/top-bar";
 import { LOCATIONS, type LocationScope } from "@/lib/location";
 import { MODULES, type AppModule } from "@/lib/nav";
@@ -26,7 +27,15 @@ const TILE_STYLES = [
   { card: "border-chile bg-chile text-ink", badge: "bg-ink text-chile" },
 ] as const;
 
-export function MoreScreen({ name, scope }: { name: string; scope: LocationScope }) {
+export function MoreScreen({
+  name,
+  scope,
+  faceIdEnabled,
+}: {
+  name: string;
+  scope: LocationScope;
+  faceIdEnabled: boolean;
+}) {
   const byHref = new Map(MODULES.map((mod) => [mod.href, mod]));
   const dashboard = byHref.get("/dashboard");
 
@@ -84,6 +93,8 @@ export function MoreScreen({ name, scope }: { name: string; scope: LocationScope
             ))}
           </ul>
         </section>
+
+        <FaceIdOffer enabled={faceIdEnabled} persist />
 
         <form action={logoutAction} className="pb-2">
           <button

@@ -19,6 +19,28 @@ model User {
   passwordHash String
   role         String   @default("owner")
   createdAt    DateTime @default(now())
+  passkeys     Passkey[]
+}
+
+/// A discoverable passkey (Face ID on iPhone). Credential material only — never a password.
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Base64url credential id from the authenticator.
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  /// JSON array of authenticator transports, when the phone sent them.
+  transports   String?
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  aaguid       String?
+  label        String    @default("Face ID")
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
 }
 
 /// Independently tracked operation. Never share financial rows across locations.
@@ -513,6 +535,12 @@ model DailySalesRecord {
   uberEatsOrders Int?
   grubhubGross  Float?
   grubhubOrders Int?
+  /// Customers new to this location that day. Null when the import did not send a count.
+  newCustomers        Int?
+  /// Customers who had ordered at this location before. Null when unknown.
+  returningCustomers  Int?
+  /// Customers Square could identify. Null when unknown.
+  identifiedCustomers Int?
   source        String
   importedAt    DateTime @default(now())
 

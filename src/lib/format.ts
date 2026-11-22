@@ -24,6 +24,12 @@ export function number(n: number): string {
   return new Intl.NumberFormat("en-US").format(n);
 }
 
+/** A missing customer count stays a dash. Zero is a real count. */
+export function countOrDash(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return number(value);
+}
+
 export function channelLabel(channel: string): string {
   switch (channel) {
     case "in_store":

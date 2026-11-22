@@ -12,7 +12,9 @@ export async function proxy(request: NextRequest) {
     pathname === "/apple-icon" ||
     pathname.startsWith("/api/ingest/") ||
     pathname === "/api/sync/employee-hours" ||
-    pathname === "/api/sync/inventory";
+    pathname === "/api/sync/inventory" ||
+    pathname === "/api/passkey/login/options" ||
+    pathname === "/api/passkey/login/verify";
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySessionToken(token) : null;

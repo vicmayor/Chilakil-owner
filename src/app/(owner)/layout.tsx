@@ -26,7 +26,7 @@ export default async function OwnerLayout({
   return (
     <div className="min-h-dvh bg-paper">
       <div className="mx-auto min-h-dvh w-full max-w-lg md:max-w-3xl lg:max-w-5xl">{children}</div>
-      <div className="h-20" style={{ height: "calc(4.25rem + env(safe-area-inset-bottom))" }} />
+      <div style={{ height: "calc(5.75rem + env(safe-area-inset-bottom))" }} />
       <BottomNav inboxCount={inboxCount} />
     </div>
   );

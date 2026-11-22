@@ -19,6 +19,9 @@ function row(partial: Pick<SalesRecord, "locationId" | "date" | "grossSales"> & 
     uberEatsOrders: null,
     grubhubGross: null,
     grubhubOrders: null,
+    newCustomers: null,
+    returningCustomers: null,
+    identifiedCustomers: null,
     source: "square-export",
     importedAt: "2026-10-06T18:00:00.000Z",
     ...partial,
@@ -73,6 +76,76 @@ test("featured day falls back to the latest imported day", () => {
   assert.equal(view.featuredDate, "2026-10-04");
   assert.equal(view.sampleOnFeatured, true);
   assert.equal(view.anySample, true);
+});
+
+test("new customers stay on their location and ALL sums only complete counts", () => {
+  const view = buildSalesView(
+    [
+      row({
+        locationId: "glendale",
+        date: "2026-10-06",
+        grossSales: 500,
+        newCustomers: 8,
+        returningCustomers: 40,
+      }),
+      row({
+        locationId: "avondale",
+        date: "2026-10-06",
+        grossSales: 200,
+        newCustomers: 3,
+      }),
+      row({
+        locationId: "glendale",
+        date: "2026-10-05",
+        grossSales: 100,
+        newCustomers: 2,
+      }),
+      row({ locationId: "avondale", date: "2026-10-04", grossSales: 40 }),
+    ],
+    ["glendale", "avondale"],
+    "2026-10-06",
+  );
+  assert.equal(view.featured[0]?.newCustomers, 8);
+  assert.equal(view.featured[1]?.newCustomers, 3);
+  assert.equal(view.featured[0]?.returningCustomers, 40);
+  assert.equal(view.featured[1]?.returningCustomers, null);
+  assert.equal(view.yesterday[0]?.newCustomers, 2);
+  assert.equal(view.yesterday[1], null);
+  assert.equal(view.weekToDate.byLocation[0].newCustomers, 10);
+  assert.equal(view.weekToDate.byLocation[1].newCustomers, 3);
+  assert.equal(view.weekToDate.combined?.newCustomers, 13);
+  assert.equal(view.weekToDate.byLocation[0].returningCustomers, 40);
+  assert.equal(view.weekToDate.byLocation[1].returningCustomers, null);
+  assert.equal(view.weekToDate.combined?.returningCustomers, null);
+  assert.equal(view.last7.find((day) => day.date === "2026-10-04")?.newCustomersByLocation[0], null);
+  assert.equal(view.last7.find((day) => day.date === "2026-10-04")?.newCustomersByLocation[1], null);
+
+  const glendale = buildSalesView(
+    [
+      row({ locationId: "glendale", date: "2026-10-06", grossSales: 500, newCustomers: 8 }),
+      row({ locationId: "avondale", date: "2026-10-06", grossSales: 200, newCustomers: 99 }),
+    ],
+    ["glendale"],
+    "2026-10-06",
+  );
+  assert.equal(glendale.featured.length, 1);
+  assert.equal(glendale.featured[0]?.newCustomers, 8);
+  assert.equal(glendale.weekToDate.combined, null);
+  assert.equal(glendale.weekToDate.byLocation[0].newCustomers, 8);
+});
+
+test("a reported zero stays zero and a missing count stays empty", () => {
+  const view = buildSalesView(
+    [
+      row({ locationId: "glendale", date: "2026-10-06", grossSales: 10, newCustomers: 0 }),
+      row({ locationId: "avondale", date: "2026-10-06", grossSales: 10 }),
+    ],
+    ["glendale", "avondale"],
+    "2026-10-06",
+  );
+  assert.equal(view.featured[0]?.newCustomers, 0);
+  assert.equal(view.featured[1]?.newCustomers, null);
+  assert.equal(view.weekToDate.combined?.newCustomers, null);
 });
 
 test("week-over-week change is null when last week is empty", () => {

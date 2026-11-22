@@ -117,6 +117,8 @@ npm run ingest -- ubereats-weekly examples/ubereats-weekly.json
 
 Example files live in `examples/`. `source` cannot be `sample` on these endpoints; that value is only for the local demo seed.
 
+`POST /api/ingest/daily-sales` also accepts optional customer counts on each record: `newCustomers`, `returningCustomers`, and `identifiedCustomers`. Each is a non-negative integer for that location and Phoenix date. Omit the field, or send `null`, when Square did not count it — the row stores null and the sales screen shows a dash. `0` is a real zero, not a dash. Payloads that leave the fields out still import. Re-posting the same location and date replaces the stored counts, so a later payload that omits them clears them. Glendale and Avondale stay on separate rows. The ALL view adds a labeled combined total only when every location in that view has a number.
+
 ## Employee hours
 
 The Employees screen pulls Sunday–Saturday pay periods from the Chilakil Team API. It does not edit or approve hours. Set `CHILAKIL_TEAM_API_KEY`. The base URL defaults to `https://team.chilakiltogo.com`; set `CHILAKIL_TEAM_API_URL` only to point somewhere else. `CHILAKIL_TEAM_API_TOKEN` is used only when the key is unset. If neither secret is set, the screen says **Not connected** and Sync now is hidden.

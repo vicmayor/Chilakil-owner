@@ -51,6 +51,9 @@ export const dailySalesRecordSchema = z.object({
   uberEatsOrders: count.optional(),
   grubhubGross: nonNegMoney.optional(),
   grubhubOrders: count.optional(),
+  newCustomers: count.nullable().optional(),
+  returningCustomers: count.nullable().optional(),
+  identifiedCustomers: count.nullable().optional(),
   source: z.string().trim().min(1).max(80),
 });
 
@@ -122,6 +125,9 @@ export const DAILY_SALES_NUMERIC_COLUMNS = new Set([
   "uberEatsOrders",
   "grubhubGross",
   "grubhubOrders",
+  "newCustomers",
+  "returningCustomers",
+  "identifiedCustomers",
 ]);
 
 export const DOORDASH_WEEKLY_NUMERIC_COLUMNS = new Set([
@@ -177,6 +183,9 @@ export type NormalizedDailySale = {
   uberEatsOrders: number | null;
   grubhubGross: number | null;
   grubhubOrders: number | null;
+  newCustomers: number | null;
+  returningCustomers: number | null;
+  identifiedCustomers: number | null;
   source: string;
 };
 
@@ -411,6 +420,9 @@ function normalizeDaily(data: z.infer<typeof dailySalesRecordSchema>): Normalize
     uberEatsOrders: uberEats?.orders ?? data.uberEatsOrders ?? null,
     grubhubGross: grubhub?.gross ?? data.grubhubGross ?? null,
     grubhubOrders: grubhub?.orders ?? data.grubhubOrders ?? null,
+    newCustomers: data.newCustomers ?? null,
+    returningCustomers: data.returningCustomers ?? null,
+    identifiedCustomers: data.identifiedCustomers ?? null,
     source: data.source,
   };
 }

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   applicationName: "Chilakil Owner",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Chilakil",
   },
   formatDetection: { telephone: false },

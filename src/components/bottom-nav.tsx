@@ -15,7 +15,7 @@ const TABS = [
 ];
 
 const itemClass =
-  "relative flex min-h-14 min-w-0 w-full flex-col items-center justify-center gap-0.5 px-0.5 text-[9px] font-bold leading-none tracking-tight min-[360px]:text-[10px] min-[390px]:text-[11px]";
+  "relative flex min-h-14 min-w-0 w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-0.5 text-[9px] font-bold leading-none tracking-tight min-[360px]:text-[10px] min-[390px]:text-[11px]";
 
 export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
   const pathname = usePathname();
@@ -39,10 +39,10 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-0 z-40 px-3"
+      style={{ paddingBottom: "max(0.55rem, env(safe-area-inset-bottom))" }}
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-6 md:max-w-3xl">
+      <ul className="mx-auto grid max-w-lg grid-cols-6 gap-0.5 rounded-[1.65rem] border border-line bg-card p-1 shadow-[0_18px_50px_-18px_rgba(0,0,0,0.55)]">
         {TABS.map((tab) => {
           const active =
             tab.href === "/more"
@@ -57,23 +57,14 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
           const Icon = tab.icon;
           return (
             <li key={tab.href} className="min-w-0">
-              <Link
-                href={tab.href}
-                className={`${itemClass} ${active ? "text-ink" : "text-muted"}`}
-              >
-                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} className="shrink-0" />
+              <Link href={tab.href} className={`${itemClass} ${active ? "bg-chile text-ink" : "text-muted"}`}>
+                <Icon size={20} strokeWidth={active ? 2.5 : 1.8} className="shrink-0" />
                 {tab.href === "/messages" && inboxCount > 0 ? (
-                  <span className="absolute right-0.5 top-1 min-w-4 rounded-full bg-chile px-1 text-[10px] font-bold leading-4 text-ink">
+                  <span className="absolute right-0.5 top-1 min-w-4 rounded-full bg-ink px-1 text-[10px] font-bold leading-4 text-chile">
                     {inboxCount}
                   </span>
                 ) : null}
                 <span className="max-w-full truncate">{tab.label}</span>
-                <span
-                  className={`absolute bottom-1 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full ${
-                    active ? "bg-chile" : "bg-transparent"
-                  }`}
-                  aria-hidden
-                />
               </Link>
             </li>
           );
@@ -85,14 +76,10 @@ export function BottomNav({ inboxCount = 0 }: { inboxCount?: number }) {
             disabled={refreshing}
             aria-busy={refreshing}
             aria-label={REFRESH_NAV_LABEL}
-            className={`${itemClass} ${refreshing ? "text-ink" : "text-muted"}`}
+            className={`${itemClass} ${refreshing ? "bg-chile text-ink" : "text-muted"}`}
           >
-            <span
-              className={`inline-flex shrink-0 items-center justify-center rounded-full ${
-                refreshing ? "size-6 animate-spin bg-chile text-ink" : ""
-              }`}
-            >
-              <RefreshCw size={20} strokeWidth={refreshing ? 2.4 : 1.8} aria-hidden />
+            <span className={`inline-flex shrink-0 items-center justify-center ${refreshing ? "animate-spin" : ""}`}>
+              <RefreshCw size={20} strokeWidth={refreshing ? 2.5 : 1.8} aria-hidden />
             </span>
             <span className="max-w-full truncate">{REFRESH_NAV_LABEL}</span>
           </button>

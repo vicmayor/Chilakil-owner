@@ -9,7 +9,7 @@ export function InventoryWatch({
   if (rows.length === 0) return null;
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-semibold">Inventory</h2>
+      <h2 className="text-base font-extrabold">Inventory</h2>
       {rows.map((row) => (
         <AlertCard key={row.locationId} tone="problem" href="/inventory" title={placeTitle(row.locationId)}>
           <p>Se terminó {row.out}</p>

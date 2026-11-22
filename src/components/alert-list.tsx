@@ -1,13 +1,12 @@
 import { AlertCard } from "@/components/design/alert-card";
+import { EmptyState } from "@/components/design/empty-state";
 import { LocationDot } from "@/components/ui";
 import type { Alert } from "@prisma/client";
 
 export function AlertList({ alerts }: { alerts: Alert[] }) {
   if (alerts.length === 0) {
     return (
-      <p className="rounded-3xl border border-dashed border-line bg-card px-4 py-6 text-sm text-muted">
-        No alerts in this location scope.
-      </p>
+      <EmptyState title="No alerts in this location scope." />
     );
   }
 
