@@ -20,6 +20,9 @@ export type SalesRecord = {
   uberEatsOrders: number | null;
   grubhubGross: number | null;
   grubhubOrders: number | null;
+  newCustomers: number | null;
+  returningCustomers: number | null;
+  identifiedCustomers: number | null;
   source: string;
   importedAt: string;
 };
@@ -42,6 +45,9 @@ export type LocationDay = {
   uberEatsOrders: number | null;
   grubhubGross: number | null;
   grubhubOrders: number | null;
+  newCustomers: number | null;
+  returningCustomers: number | null;
+  identifiedCustomers: number | null;
   source: string;
   importedAt: string;
   sample: boolean;
@@ -53,13 +59,22 @@ export type PeriodSlice = {
   net: number;
   orders: number;
   days: number;
+  newCustomers: number | null;
+  returningCustomers: number | null;
+  identifiedCustomers: number | null;
+};
+
+export type CustomerCounts = {
+  newCustomers: number | null;
+  returningCustomers: number | null;
+  identifiedCustomers: number | null;
 };
 
 export type PeriodSummary = {
   start: string;
   end: string;
   byLocation: PeriodSlice[];
-  combined: { gross: number; net: number; orders: number; label: string } | null;
+  combined: ({ gross: number; net: number; orders: number; label: string } & CustomerCounts) | null;
 };
 
 export type SalesView = {
@@ -70,7 +85,11 @@ export type SalesView = {
   scopeIds: LocationId[];
   featured: Array<LocationDay | null>;
   yesterday: Array<LocationDay | null>;
-  last7: Array<{ date: string; grossByLocation: Array<number | null> }>;
+  last7: Array<{
+    date: string;
+    grossByLocation: Array<number | null>;
+    newCustomersByLocation: Array<number | null>;
+  }>;
   weekToDate: PeriodSummary;
   lastWeek: PeriodSummary;
   history: Array<{ date: string; days: Array<LocationDay | null> }>;
@@ -109,6 +128,7 @@ export function buildSalesView(records: SalesRecord[], ids: LocationId[], today:
     last7: last7Dates.map((date) => ({
       date,
       grossByLocation: ids.map((id) => dayFor(scoped, id, date)?.grossSales ?? null),
+      newCustomersByLocation: ids.map((id) => dayFor(scoped, id, date)?.newCustomers ?? null),
     })),
     weekToDate: summarize(scoped, ids, weekStart, today),
     lastWeek: summarize(scoped, ids, lastWeekStart, lastWeekEnd),
@@ -152,6 +172,9 @@ function dayFor(records: SalesRecord[], locationId: LocationId, date: string | n
     uberEatsOrders: record.uberEatsOrders,
     grubhubGross: record.grubhubGross,
     grubhubOrders: record.grubhubOrders,
+    newCustomers: record.newCustomers,
+    returningCustomers: record.returningCustomers,
+    identifiedCustomers: record.identifiedCustomers,
     source: record.source,
     importedAt: record.importedAt,
     sample: record.source === "sample",
@@ -169,6 +192,9 @@ function summarize(records: SalesRecord[], ids: LocationId[], start: string, end
       net: round2(rows.reduce((sum, row) => sum + row.netSales, 0)),
       orders: rows.reduce((sum, row) => sum + row.orderCount, 0),
       days: rows.length,
+      newCustomers: sumReported(rows.map((row) => row.newCustomers)),
+      returningCustomers: sumReported(rows.map((row) => row.returningCustomers)),
+      identifiedCustomers: sumReported(rows.map((row) => row.identifiedCustomers)),
     };
   });
   const combined =
@@ -178,9 +204,25 @@ function summarize(records: SalesRecord[], ids: LocationId[], start: string, end
           net: round2(byLocation.reduce((sum, row) => sum + row.net, 0)),
           orders: byLocation.reduce((sum, row) => sum + row.orders, 0),
           label: COMBINED_LABEL,
+          newCustomers: sumEvery(byLocation.map((row) => row.newCustomers)),
+          returningCustomers: sumEvery(byLocation.map((row) => row.returningCustomers)),
+          identifiedCustomers: sumEvery(byLocation.map((row) => row.identifiedCustomers)),
         }
       : null;
   return { start, end, byLocation, combined };
+}
+
+/** Sum the numbers that were actually reported. No reports means no data, not zero. */
+function sumReported(values: Array<number | null>): number | null {
+  const present = values.filter((value): value is number => value != null);
+  if (present.length === 0) return null;
+  return present.reduce((sum, value) => sum + value, 0);
+}
+
+/** Combined total only when every location reported a number. */
+function sumEvery(values: Array<number | null>): number | null {
+  if (values.length === 0 || values.some((value) => value == null)) return null;
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
 }
 
 function round2(n: number): number {

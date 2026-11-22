@@ -22,6 +22,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.1.0",
     "bcryptjs": "^3.0.2",
     "jose": "^6.1.0",
     "lucide-react": "^0.544.0",
@@ -39,6 +41,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "playwright-core": "^1.65.1",
     "prisma": "^6.16.2",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",

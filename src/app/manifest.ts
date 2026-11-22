@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Owner app for Chilakil To Go — Glendale and Avondale, tracked separately.",
     start_url: "/dashboard",
     display: "standalone",
-    background_color: "#ffffff",
+    background_color: "#f6f3ee",
     theme_color: "#ffc645",
     lang: "en",
     icons: [

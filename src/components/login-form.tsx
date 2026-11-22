@@ -12,7 +12,7 @@ export function LoginForm({ action }: Props) {
   const [state, formAction, pending] = useActionState(action, undefined);
 
   return (
-    <form action={formAction} className="mt-8 space-y-4">
+    <form action={formAction} className="mt-4 space-y-4">
       <label className="block">
         <span className="text-sm font-medium">Email</span>
         <SearchField

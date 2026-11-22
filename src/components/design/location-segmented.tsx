@@ -39,12 +39,12 @@ export function LocationSegmented({ value }: { value: LocationScope }) {
             role="tab"
             aria-selected={active}
             onClick={() => select(opt.id)}
-            className={`flex min-h-[4.5rem] flex-col items-start justify-center rounded-2xl px-3 py-2 text-left ${
-              active ? "bg-ink text-white" : "bg-paper-2 text-ink"
+            className={`flex min-h-[4.25rem] flex-col items-start justify-center rounded-2xl px-3 py-2 text-left shadow-[0_8px_20px_-16px_rgba(0,0,0,0.8)] ${
+              active ? "bg-ink text-chile" : "bg-white text-ink"
             }`}
           >
             <span className="text-[15px] font-extrabold leading-tight tracking-tight">{opt.label}</span>
-            <span className={`mt-0.5 text-[11px] font-semibold leading-4 ${active ? "text-white/70" : "text-muted"}`}>
+            <span className={`mt-0.5 text-[11px] font-semibold leading-4 ${active ? "text-chile/80" : "text-muted"}`}>
               {opt.sub}
             </span>
           </button>

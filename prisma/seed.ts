@@ -275,6 +275,9 @@ async function main() {
       const gross = Object.values(channels).reduce((sum, row) => sum + row.gross, 0);
       const fees = Object.values(channels).reduce((sum, row) => sum + row.fees, 0);
       const orders = Object.values(channels).reduce((sum, row) => sum + row.orders, 0);
+      const span = Math.abs(day.offset);
+      const newCustomers = loc === GLENDALE ? 6 + span * 2 : 2 + span;
+      const returningCustomers = loc === GLENDALE ? 78 + span * 4 : 28 + span * 2;
       await prisma.dailySalesRecord.create({
         data: {
           locationId: loc,
@@ -287,6 +290,9 @@ async function main() {
           tax: null,
           orderCount: orders,
           averageTicket: orders > 0 ? round2(gross / orders) : 0,
+          newCustomers,
+          returningCustomers,
+          identifiedCustomers: newCustomers + returningCustomers,
           inStoreGross: channels.in_store.gross,
           inStoreOrders: channels.in_store.orders,
           doorDashGross: channels.doordash.gross,

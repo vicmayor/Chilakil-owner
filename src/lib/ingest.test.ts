@@ -59,6 +59,51 @@ test("daily sales rejects an unknown location and a duplicate key", () => {
   if (!duplicate.ok) assert.match(duplicate.error, /Duplicate/);
 });
 
+test("daily sales customer counts are optional and stay null when omitted", () => {
+  const omitted = parseDailySalesBody(daily);
+  assert.equal(omitted.ok, true);
+  if (!omitted.ok) return;
+  assert.equal(omitted.records[0].newCustomers, null);
+  assert.equal(omitted.records[0].returningCustomers, null);
+  assert.equal(omitted.records[0].identifiedCustomers, null);
+
+  const counted = parseDailySalesBody({
+    ...daily,
+    newCustomers: 4,
+    returningCustomers: 11,
+    identifiedCustomers: 15,
+  });
+  assert.equal(counted.ok, true);
+  if (!counted.ok) return;
+  assert.equal(counted.records[0].newCustomers, 4);
+  assert.equal(counted.records[0].returningCustomers, 11);
+  assert.equal(counted.records[0].identifiedCustomers, 15);
+
+  const zero = parseDailySalesBody({ ...daily, newCustomers: 0, returningCustomers: null });
+  assert.equal(zero.ok, true);
+  if (!zero.ok) return;
+  assert.equal(zero.records[0].newCustomers, 0);
+  assert.equal(zero.records[0].returningCustomers, null);
+
+  const negative = parseDailySalesBody({ ...daily, newCustomers: -1 });
+  assert.equal(negative.ok, false);
+});
+
+test("CSV daily sales can carry the optional customer columns", () => {
+  const csv = [
+    "location,date,grossSales,netSales,orderCount,newCustomers,returningCustomers,source",
+    "glendale,2026-10-06,100,80,4,6,20,square-export",
+    "avondale,2026-10-06,40,30,2,,,square-export",
+  ].join("\n");
+  const parsed = parseDailySalesBody(csvToRecords(csv, DAILY_SALES_NUMERIC_COLUMNS));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.records[0].newCustomers, 6);
+  assert.equal(parsed.records[0].returningCustomers, 20);
+  assert.equal(parsed.records[1].newCustomers, null);
+  assert.equal(parsed.records[1].returningCustomers, null);
+});
+
 test("daily sales rejects the reserved sample source", () => {
   const parsed = parseDailySalesBody({ ...daily, source: "sample" });
   assert.equal(parsed.ok, false);

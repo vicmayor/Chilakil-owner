@@ -34,6 +34,9 @@ function toSalesRecord(row: {
   uberEatsOrders: number | null;
   grubhubGross: number | null;
   grubhubOrders: number | null;
+  newCustomers: number | null;
+  returningCustomers: number | null;
+  identifiedCustomers: number | null;
   source: string;
   importedAt: Date;
 }): SalesRecord {
@@ -56,6 +59,9 @@ function toSalesRecord(row: {
     uberEatsOrders: row.uberEatsOrders,
     grubhubGross: row.grubhubGross,
     grubhubOrders: row.grubhubOrders,
+    newCustomers: row.newCustomers,
+    returningCustomers: row.returningCustomers,
+    identifiedCustomers: row.identifiedCustomers,
     source: row.source,
     importedAt: row.importedAt.toISOString(),
   };

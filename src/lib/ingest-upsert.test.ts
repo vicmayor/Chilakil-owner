@@ -94,6 +94,9 @@ test("daily sales upsert is idempotent and does not write the other location", a
   assert.equal(rows.length, 1);
   assert.equal(rows[0].locationId, "glendale");
   assert.equal(rows[0].grossSales, 250);
+  assert.equal(rows[0].newCustomers, null);
+  assert.equal(rows[0].returningCustomers, null);
+  assert.equal(rows[0].identifiedCustomers, null);
 
   const avondale = await prisma.dailySalesRecord.count({
     where: { locationId: "avondale", date: DATES[0] },

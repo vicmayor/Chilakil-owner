@@ -55,3 +55,24 @@ textarea {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.skeleton {
+  background-image: linear-gradient(90deg, #e8e4dc 0%, #f6f3ee 45%, #e8e4dc 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+@media (display-mode: standalone) {
+  body {
+    background: var(--color-paper);
+  }
+}

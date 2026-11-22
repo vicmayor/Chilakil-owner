@@ -11,6 +11,9 @@
       "tax": 412.75,
       "orderCount": 119,
       "averageTicket": 43.03,
+      "newCustomers": 12,
+      "returningCustomers": 86,
+      "identifiedCustomers": 98,
       "channels": {
         "inStore": { "gross": 3400, "orders": 78 },
         "doorDash": { "gross": 1100, "orders": 24 },

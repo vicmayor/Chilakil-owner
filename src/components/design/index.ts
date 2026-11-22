@@ -1,4 +1,5 @@
 export { Accordion } from "@/components/design/accordion";
+export { EmptyState } from "@/components/design/empty-state";
 export { AlertCard } from "@/components/design/alert-card";
 export { LocationSegmented } from "@/components/design/location-segmented";
 export { PageHeader } from "@/components/design/page-header";
